@@ -406,6 +406,19 @@ responsivo.
 O `clamp` substitui o par `2.5rem` / `lg:3.5rem` que sete telas repetiam à mão,
 sem o degrau seco no breakpoint.
 
+Mais dois degraus, para **número grande** — a estatística de um cartão, o
+contador de uma tela vazia:
+
+| Classe          | Tamanho                        | Papel                          |
+| --------------- | ------------------------------ | ------------------------------ |
+| `.txt-numero`   | `clamp(1.75rem, 4vw, 2.25rem)` | número dentro de cartão        |
+| `.txt-numero-g` | `clamp(2.5rem, 8vw, 4.5rem)`   | número que É a tela (destaque) |
+
+Eles existem porque quatro tamanhos diferentes tinham sido inventados para o
+mesmo papel (1.75/2.25, 2.25/2.75, 2.5 fixo e 3.5/4.5). Quando um papel aparece
+duas vezes com números diferentes, o certo não é escolher um: é **dar nome aos
+dois degraus** e usar só eles.
+
 ### 4.2 Os três gestos tipográficos
 
 ```css
@@ -481,12 +494,18 @@ para parar de alternar entre `gap-2.5` e `gap-3` sem motivo.
 | 1     | 4   | dentro de um controle — ícone colado ao rótulo |
 | 2     | 8   | entre irmãos próximos — chips de uma linha     |
 | 3     | 12  | entre campos de um mesmo grupo                 |
-| 4     | 16  | padding de cartão pequeno, entre grupos        |
-| 6     | 24  | entre blocos de uma seção                      |
+| 4     | 16  | padding de linha de lista, entre grupos        |
+| 5     | 20  | padding de **cartão**                          |
+| 6     | 24  | entre blocos de uma seção, cartão grande       |
 | 8     | 32  | entre seções                                   |
 
 Meios-passos (1.5, 2.5, 3.5) **só** quando um passo cheio quebra o alinhamento
 de um ícone. Nada de valor arbitrário.
+
+O passo 5 entrou depois, e a razão vale ser dita: ele já era o padding de
+cartão mais usado do app, e não estava nesta tabela. A lista dizia 4 ou 6, a
+tela fazia 5, e cada cartão novo era um sorteio entre os três. Escala que não
+descreve a realidade não é seguida — é contornada.
 
 ### 5.2 Largura
 
@@ -550,6 +569,36 @@ que flutua (barra de navegação, folha, menu).
   border-radius: var(--raio-m);
 }
 ```
+
+### 5.6 Véus
+
+O que fica **entre** uma mídia e um controle por cima dela — o X de remover, o
+giro de "enviando", a lupa. Dois passos, e só dois:
+
+```css
+--veu-midia: rgb(0 0 0 / 0.5); /* repouso */
+--veu-midia-forte: rgb(0 0 0 / 0.7); /* toque */
+```
+
+Eram cinco opacidades escritas à mão (35%, 40%, 50%, 60%, 70%) para a mesma
+função, e o mesmo botão aparecia mais escuro numa tela do que na outra. Preto
+fixo nos dois temas: o véu existe para dar contraste **contra a foto**, não
+contra o fundo do app, e a foto não muda com o tema.
+
+Um terceiro véu, de papel diferente, é o do **alvo de soltar arquivo**:
+
+```css
+/* Aqui o fundo do app se APAGA para o alvo ficar sozinho no meio. Por isso
+   é a própria cor de fundo, e não preto — e o color-mix cobre os dois temas. */
+--veu-solta: color-mix(in srgb, var(--fundo) 88%, transparent);
+```
+
+**Um alvo de soltar, e só um.** Se a casca do app já cobre a janela inteira
+quando um arquivo paira, a tela específica **não** pode ter o seu: os dois
+acendem juntos, e o resultado é uma moldura tracejada em volta de tudo, outra em
+volta da lista e um cartão no meio das duas. Três desenhos para uma coisa só.
+Fica o de cima, e o tracejado é do **cartão**, não da página — moldura
+tracejada em volta da janela parece erro de layout.
 
 ---
 
@@ -852,6 +901,33 @@ ele faz é engrossar o sublinhado.
 Um pixel de elevação é de propósito: o suficiente para o olho registrar, pouco
 para não parecer que a página está pulando.
 
+**Quando o filho pressiona o pai.** Um cabeçalho clicável dentro de um cartão
+deve encolher o **cartão inteiro**, não a si mesmo — senão a área cinza do
+toque fica menor que o cartão e parece recortada. Isso se escreve com `:has()`:
+
+```css
+/* O botão em si não anima… */
+.pasta > h2 > button.pasta-cabecalho:active {
+  transform: none;
+}
+/* …quem anima é o cartão que o contém. */
+@media (prefers-reduced-motion: no-preference) {
+  .pasta:has(> h2 > button.pasta-cabecalho:active) {
+    transform: scale(0.99);
+    transition-duration: 80ms;
+  }
+}
+```
+
+E aqui vai uma armadilha que custou duas tentativas: **`:is(button, [role="button"], …)` pesa como
+classe**, porque a especificidade de `:is()` é a do argumento mais forte — e um
+seletor de atributo vale uma classe. Um `button:active { transform: none }`
+escrito com seletor de elemento (0,0,1) perde para o piso genérico e é ignorado
+**em silêncio**. Se uma regra de anulação "não está pegando", conte a
+especificidade dos dois lados antes de mexer em qualquer outra coisa; e prefira
+anular pelo caminho completo (`.pasta > h2 > button.x:active`), que é explícito
+e não depende de sorte.
+
 ### 7.3 Ícones que reagem
 
 Um ícone sozinho dentro de botão ou link cresce 12% no hover e encolhe para 90%
@@ -939,6 +1015,43 @@ confortável, cresce o ícone e não o botão.
 
 Todos moram em `components/ui/`. A regra: **antes de escrever uma classe,
 procure o componente.**
+
+### 8.0 A regra número um, e por que ela é a número um
+
+Esta é a única regra deste documento que, sozinha, decide se o app continua
+parecendo um produto depois de seis meses. Ela é violada sempre da mesma forma:
+não por rebeldia, mas porque escrever `className="rounded-xl bg-… px-4 py-2"`
+custa dez segundos e procurar o componente custa trinta.
+
+O preço, medido no app de referência:
+
+| O que foi copiado à mão | Cópias | O que deu errado                                    |
+| ----------------------- | -----: | --------------------------------------------------- |
+| Preenchimento de acento |     62 | cada uma com o seu padding, raio e hover            |
+| Botão "← Voltar"        |      8 | nenhuma com anel de foco; 6 ficaram sem o indicador |
+| Tamanho de tipografia   |    209 | `text-[13.5px]` e afins, sem escala                 |
+| Raio de canto           |    244 | quatro raios para o mesmo papel                     |
+| Véu sobre foto          |      5 | o mesmo botão mais escuro numa tela que na outra    |
+| Estado vazio            |      3 | dois na MESMA tela, com linguagens diferentes       |
+| Duração de transição    |      5 | 300 ms, 320 ms e 500 ms para gestos irmãos          |
+
+Repare no padrão: **a cópia nunca dói na hora**. Ela dói no dia em que uma
+mudança precisa acontecer nos oito lugares e chega em dois — e o que sobra não é
+"inconsistência visual", é defeito funcional (o botão sem foco, o indicador que
+não acende).
+
+**Como detectar, sem depender de disciplina.** Um `grep` periódico responde:
+
+```bash
+# quantas vezes o mesmo bloco de classes aparece?
+grep -rno 'rounded-\[[0-9]' src/ --include=*.tsx     # raio escrito à mão
+grep -rno 'duration-[0-9]\+' src/ --include=*.tsx    # duração fora do token
+grep -rno 'text-\[[0-9.]*px\]' src/ --include=*.tsx   # tipografia arbitrária
+```
+
+Três ocorrências do mesmo desenho é o limite: na terceira, extraia. E toda vez
+que extrair, some a variação — se as três cópias divergiam, uma delas estava
+errada, e agora dá para saber qual.
 
 ### 8.1 Botão
 
@@ -1201,6 +1314,82 @@ O cartão tingido por categoria usa `::before` com um `radial-gradient` da cor e
 22%, que aparece no hover junto de uma borda em 45% da mesma cor — a cor entra
 como luz, não como preenchimento.
 
+### 8.14 Botão de voltar
+
+```tsx
+<BotaoVoltar aoVoltar={() => router.back()} trocaDeRota />
+```
+
+Parece pequeno demais para virar componente. Não é — e a razão não é estética.
+
+Num app com telas cheias (criar, editar, ler, responder), o "← Voltar" acaba
+copiado em seis, oito lugares, sempre a mesma linha de cem caracteres de classe.
+Enquanto foram cópias, duas coisas aconteceram: **nenhuma** tinha anel de foco,
+e quando o indicador de rota passou a acender no clique, **só duas das oito**
+ganharam a chamada — as outras seis continuavam parecendo que não tinham sido
+tocadas enquanto a tela de destino montava.
+
+`trocaDeRota` existe porque voltar nem sempre navega: às vezes fecha um painel
+ou volta uma etapa dentro da mesma tela. Acender o indicador nesses casos o
+deixa pendurado esperando uma navegação que não vem.
+
+### 8.15 Só com internet / só com o recurso
+
+```tsx
+<SoOnline motivo="Isto precisa de internet">{botao}</SoOnline>
+```
+
+**O que exige rede não some: fica na tela, apagado e inerte.** Sumir faz a
+pessoa procurar o botão e duvidar da própria memória; apagado ela entende que
+volta quando a internet voltar.
+
+Duas exigências de implementação:
+
+- O atributo **`inert`** é o que de fato desliga o conteúdo — clique, foco,
+  teclado e leitor de tela. `pointer-events: none` sozinho deixa o link
+  alcançável por Tab, o que é pior que nada.
+- Opacidade de **35%**, e um `title`/`aria-label` dizendo o motivo.
+
+O mesmo invólucro serve para recurso de plano pago (`SoComIa` e afins): mesma
+gramática, motivo diferente.
+
+### 8.16 Seleção múltipla
+
+Um padrão, usado igual em toda lista que permite apagar ou mover em lote:
+
+1. Botão **"Selecionar"** no cabeçalho da tela (vira "Cancelar" quando ativo).
+2. Com a seleção ligada, **o cartão inteiro é a caixa de marcar** — clicar não
+   abre mais o item. Abrir no meio de uma seleção é perder o que já foi marcado.
+3. Uma **marca redonda** à esquerda do cartão e um anel de acento em volta do
+   cartão marcado. Redonda porque, numa lista que já tem foto, ícone e chip, um
+   quadrado vazio vira mais um enfeite.
+4. As ações do cartão **somem** durante a seleção: quem manda é a barra.
+5. Barra **grudada embaixo** (`sticky bottom-0` + `pb-segura`), com "Selecionar
+   todos", a contagem e as ações. No fim de uma lista longa, um botão no rodapé
+   custaria a rolagem inteira de volta.
+
+Em lote, aja **em série** e conte o que falhou, em vez de morrer no primeiro
+erro: dez escritas em paralelo na mesma coleção produzem escrita por cima de
+escrita.
+
+### 8.17 Estado com prazo: data + selo
+
+Quando um cartão precisa dizer "até quando" e "isto se renova sozinho?", **não
+escreva uma frase**. Uma frase diz as duas coisas ao mesmo tempo e não deixa
+nenhuma visível de relance:
+
+> ~~Pago até 5 de outubro. Não renova sozinho — quando acabar, você escolhe de
+> novo.~~
+
+Vire duas informações, na mesma linha: à esquerda, ícone de calendário + a data;
+à direita, um **selo** com a resposta binária ("Renovação automática" / "Sem
+renovação automática"). Perto do fim do prazo, acrescente "· acaba em N dias" na
+cor de aviso.
+
+E **ação só quando ela faz sentido**: um botão "Renovar" ao lado de um prazo com
+meses pela frente é um convite a pagar de novo por algo que a pessoa já tem.
+Mostre-o na janela em que ele é útil (aqui: os últimos 15 dias).
+
 ---
 
 ## 9. Moldura e navegação
@@ -1347,16 +1536,35 @@ chega, sumindo em 280ms.
 
 ### 9.9 Camadas (z-index)
 
-| Camada                   | z    |
-| ------------------------ | ---- |
-| Conteúdo                 | 0    |
-| Fundo do menu do celular | 30   |
-| Navegação                | 40   |
-| Dropdown de busca        | 50   |
-| Avisos                   | 70   |
-| Folha / modal            | 80   |
-| Menu de comandos (⌘K)    | 100  |
-| Foto ampliada            | 9999 |
+**Tokens, não números soltos.** Enquanto foram números escritos em cada
+arquivo, a conta de quem fica na frente de quem só existia na cabeça de quem
+tinha escrito por último — e foi assim que uma confirmação de saída nasceu
+_atrás_ da tela de bloqueio, invisível, e uma foto ampliada precisou de
+`z-[9999]` (o número que se escolhe quando não existe escala).
+
+```css
+--z-avisos: 70; /* toast: acima de tudo que é conteúdo */
+--z-folha: 80; /* modal / folha */
+--z-visor: 90; /* mídia em tela cheia, acima da folha que a abriu */
+--z-tranca: 100; /* a tela de bloqueio cobre o app inteiro */
+--z-folha-tranca: 110; /* e o que a PRÓPRIA tranca abre fica acima dela */
+```
+
+| Camada                   | z                        |
+| ------------------------ | ------------------------ |
+| Conteúdo                 | 0                        |
+| Fundo do menu do celular | 30                       |
+| Navegação                | 40                       |
+| Dropdown de busca        | 50                       |
+| Avisos                   | `--z-avisos` (70)        |
+| Folha / modal            | `--z-folha` (80)         |
+| Mídia em tela cheia      | `--z-visor` (90)         |
+| Tela de bloqueio         | `--z-tranca` (100)       |
+| Folha aberta pela tranca | `--z-folha-tranca` (110) |
+
+Regra: **camada nova entra na escala, com nome**. Se você precisou de um número
+que não está aqui, ou falta um degrau (dê nome a ele) ou o problema não é de
+camada.
 
 ### 9.10 Pontos de quebra
 
@@ -1584,6 +1792,26 @@ transcrição, retrospectiva — nada disso é infraestrutura do design system. 
 telas que usam os mesmos tokens e os mesmos componentes. Acrescente as suas sem
 medo; o sistema não muda por causa delas.
 
+### 14.4-b O texto é dado, não código
+
+Se o app vai ter mais de um idioma — e mesmo que não vá —, **nenhuma frase mora
+no componente**. O dicionário fica em arquivos por área (`telas`, `componentes`,
+`entrada`…), com um objeto por idioma e o tipo derivado do idioma-base:
+
+```ts
+const pt = { salvar: "Salvar", fotos: (n: number) => `${n} fotos` };
+export type Textos = typeof pt;
+export const textos: Record<Idioma, Textos> = { pt, en, es };
+```
+
+Derivar o tipo do idioma-base é o detalhe que faz isto funcionar: **esquecer uma
+chave em `en` vira erro de compilação**, não uma frase em português na tela de
+alguém. Sem isso, a tradução apodrece em silêncio.
+
+O que escapa quase sempre, e é o que a revisão deve procurar: `aria-label`,
+`title`, `placeholder`, mensagem de modal de confirmação, e o rótulo "Enviando…"
+dentro de um botão que carrega.
+
 ### 14.5 O que **não** mudar
 
 Se você mexer nisto, o resultado deixa de parecer o mesmo produto:
@@ -1617,3 +1845,11 @@ Antes de dar uma tela por pronta:
 - [ ] Alvo de toque de 44px.
 - [ ] O texto está em caixa baixa no título e no infinitivo no botão.
 - [ ] Componente novo foi acrescentado à página `/estilo`.
+- [ ] Nenhuma frase escrita no componente: **todo texto vem do dicionário**,
+      inclusive `aria-label`, `title` e mensagem de modal.
+- [ ] O que exige rede está apagado e `inert`, não escondido.
+- [ ] Camada nova entrou na escala `--z-*`, com nome.
+- [ ] Existe **um** alvo de soltar arquivo, não dois.
+- [ ] Estado vazio usa o componente — inclusive o "nada encontrado" do filtro,
+      que é o que mais escapa (a mesma tela costuma ter dois).
+- [ ] Nenhum bloco de classes repetido três vezes (ver §8.0).

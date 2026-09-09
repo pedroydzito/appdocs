@@ -15,6 +15,12 @@ conteúdo.
 | [`desempenho.md`](desempenho.md)       | Como o app **responde**: cache, listas, offline, rede |
 | [`operacao.md`](operacao.md)           | Como o app **existe**: banco, login, PWA, deploy, CI  |
 
+> **Já tem um app e ele está lento?** Vá direto para
+> [`desempenho.md` §16](desempenho.md#16-diagnóstico-o-meu-app-demora-para-carregar-as-telas):
+> é um roteiro na ordem certa, e os quatro primeiros itens respondem pela quase
+> totalidade dos casos. O nº 1 — o cache do roteador — costuma ser uma linha de
+> configuração.
+
 ---
 
 ## Como usar
@@ -54,6 +60,24 @@ adivinhar.
 | Destinos e ação principal da navegação          | design system §14.3        |
 | Nome, ícones, atalhos, alvo de compartilhamento | operação §4                |
 | Telas e conteúdo                                | você                       |
+
+### Se a ideia é refazer ESTE app com outra cor
+
+É o caso mais fácil, e é literalmente três coisas:
+
+1. **A escala do acento** — onze degraus derivados de um hexadecimal (design
+   system §14.1). Troque o 500 e derive o resto; a receita está lá.
+2. **Os quatro temas** — só o que depende do acento muda. Fundo, superfícies,
+   bordas e texto continuam iguais nos dois temas, e o alto contraste continua
+   sendo um modificador combinável.
+3. **`--perigo`** — se o novo acento **não** for avermelhado, aí sim o perigo
+   volta a ser vermelho por conta própria (§3.2 explica por que, com acento
+   coral, ele é o próprio acento a 20° de matiz).
+
+Depois disso, rode o teste de contraste (§3.6) — ele reprova o par que cair
+abaixo de AA — e olhe a página `/estilo`, que mostra todo componente nos quatro
+temas lado a lado. Nada mais precisa ser tocado: nenhum componente conhece a
+cor, todos leem o token.
 
 ## O que **não** muda
 

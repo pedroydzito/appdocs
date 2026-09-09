@@ -304,6 +304,81 @@ service worker**, não ao servidor. O padrão que funciona é interceptar o POST
 service worker, guardar os arquivos num cache temporário e responder com um
 redirecionamento 303 para uma tela que os lê de lá.
 
+### 4.5-b Receber arquivo no COMPUTADOR — três caminhos, e o primeiro não existe
+
+Vale escrever com todas as letras porque custa meio dia descobrir: **o Web Share
+Target é do Android (e do ChromeOS). No macOS e no Windows, nenhum app web
+aparece na folha de compartilhar do sistema.** Não há configuração que resolva.
+
+O que existe lá, em ordem de esforço:
+
+**1. Arrastar e soltar na janela.** Funciona em qualquer navegador, sem
+instalar nada, e é o caminho mais curto. Escute na `window`, não numa área:
+
+```ts
+const temArquivo = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+
+// `dragenter`/`dragleave` chegam aninhados: conte, não use booleano.
+let dentro = 0;
+window.addEventListener("dragenter", (e) => {
+  if (temArquivo(e)) {
+    dentro++;
+    acender();
+  }
+});
+window.addEventListener("dragleave", (e) => {
+  if (temArquivo(e) && --dentro === 0) apagar();
+});
+// Sem `preventDefault` no dragover, o navegador ABRE o arquivo no lugar da página.
+window.addEventListener("dragover", (e) => {
+  if (temArquivo(e)) e.preventDefault();
+});
+```
+
+Se a pessoa já está na tela que recebe arquivos, **avise em vez de navegar**:
+trocar de rota ali pode matar uma gravação em andamento.
+
+**2. "Abrir com" no Finder / soltar no ícone do Dock.** É o `file_handlers` do
+manifesto, para o app instalado no Chrome/Edge:
+
+```json
+"file_handlers": [
+  { "action": "/nova?modo=documento",
+    "accept": { "audio/*": [".mp3", ".m4a"], "image/*": [".jpg", ".png"], "application/pdf": [".pdf"] },
+    "launch_type": "single-client" }
+]
+```
+
+O arquivo chega por `launchQueue.setConsumer(({ files }) => …)`, como
+`FileSystemFileHandle`. **Só vale para o app instalado**, e a associação é feita
+no momento da instalação — quem já tinha o app instalado antes precisa
+reinstalar para o sistema registrar os tipos.
+
+**3. Parâmetros na URL.** O caminho que nenhum sistema bloqueia: aceite
+`?texto=`, `?titulo=` e `?url=` na tela de criação. Com isso, um atalho do app
+Atalhos (macOS/iOS), um bookmarklet ou qualquer automação consegue mandar o
+trecho selecionado para dentro do app — porque _abrir uma URL_ todo sistema
+sabe fazer.
+
+Passe o texto pelo **mesmo saneador** do share do celular: é conteúdo de fora
+entrando no editor. Escape o HTML e só transforme em link o que for `http(s)` —
+`javascript:` num `href` é a forma mais antiga que existe de transformar
+"compartilhar" em "executar".
+
+E aceite-o como **estado inicial**, não num efeito: a tela nasce escrita, sem o
+quadro em branco antes de o parágrafo aparecer.
+
+### 4.5-c O app instalado serve uma versão antiga
+
+Sintoma que parece bug do app e não é: no PWA instalado, um recurso não funciona
+— e no navegador, funciona. Quase sempre é o service worker servindo uma casca
+antiga, presa desde a instalação.
+
+Duas providências: (1) o aviso de atualização precisa existir na interface (§4.4)
+e (2) quando alguém relatar algo assim, a primeira pergunta é "no navegador
+também acontece?". Se não acontece, reinstalar o app resolve — e o defeito real
+é o seu ciclo de atualização, não o recurso.
+
 ### 4.6 O que o navegador exige, e o que ele ainda não dá
 
 Para o prompt de instalação aparecer: **HTTPS** (ou `localhost`), manifesto
@@ -523,6 +598,46 @@ E um **job separado**, depois do primeiro passar, para o teste de isolamento
 entre contas (§6.3). Ele só roda no repositório de origem: um pull request de
 fork não recebe segredos, e falharia por falta de chave, não por falha de
 isolamento.
+
+### 12.1 "Preciso mesmo disso? Meus outros projetos só têm o repo e a Vercel."
+
+Pergunta legítima, e a resposta honesta é: **a Vercel só responde uma pergunta —
+"compila?"**. Ela não sabe se o app ficou mais lento, se uma tradução sumiu, se
+uma conta passou a enxergar os dados da outra. Se o build passar, ela publica.
+
+O que cada passo compra, e o que acontece sem ele:
+
+| Passo             | O que ele pega                                | Sem ele                                                        |
+| ----------------- | --------------------------------------------- | -------------------------------------------------------------- |
+| `typecheck`       | campo renomeado, chave de dicionário faltando | a tela quebra no aparelho de quem usa, não no seu              |
+| `lint` (com teto) | efeito sem dependência, hook condicional      | bug de render que só aparece em condição de corrida            |
+| `format:check`    | formatação divergente                         | diff de 300 linhas onde mudou uma                              |
+| `test`            | a regra de negócio que você quebrou sem ver   | descoberto pelo usuário                                        |
+| `build`           | erro de pré-render, variável faltando         | deploy quebrado — a Vercel também pega, mas depois de publicar |
+| `conferir:bundle` | a tela que engordou 15% num commit            | **nada**: o app fica lento um pouco por vez, e ninguém nota    |
+| isolamento (RLS)  | uma conta lendo os dados da outra             | vazamento de dados                                             |
+
+Os dois últimos são os que **nenhuma plataforma faz por você**, e são os dois
+mais caros de descobrir tarde. O de bundle é o mais subestimado: nenhum commit
+deixa o app lento — cem commits deixam, e sem um teto que reprova, não existe o
+dia em que alguém decide reagir.
+
+**A versão mínima que já vale a pena**, se o projeto é pequeno: `typecheck` +
+`build`. São dez linhas de YAML e cobrem a maior parte do estrago. O resto entra
+quando o app começar a ter usuário que não é você.
+
+**O que o CI não é:** ele não substitui rodar o app. Nenhum teste aqui percebe
+que o espaçamento ficou feio ou que o texto está confuso. Ele existe para você
+não gastar atenção com o que a máquina confere melhor — e sobrar atenção para o
+que só uma pessoa vê.
+
+### 12.2 O teto de avisos, e por que não zero
+
+Um lint com zero aviso vira um lint que ninguém pode adicionar regra nova, e
+acaba desligado. Um lint sem teto vira um lint que ninguém lê. O meio-termo é
+`--max-warnings N` com o N **escrito no workflow, com um comentário dizendo o
+que são aqueles avisos** e por que são aceitáveis. Quando o número sobe, o
+commit precisa dizer por quê — e essa frase é a revisão.
 
 ---
 

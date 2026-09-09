@@ -26,6 +26,7 @@ tiver aquele recurso.
 13. [Observabilidade](#13-observabilidade)
 14. [Recursos pesados específicos](#14-recursos-pesados-específicos)
 15. [Checklist](#15-checklist)
+16. [Diagnóstico: "o meu app demora"](#16-diagnóstico-o-meu-app-demora-para-carregar-as-telas)
 
 ---
 
@@ -51,14 +52,62 @@ Onde cada uma costuma quebrar:
 
 Um script no CI lê a saída do build e reprova quando passa do teto:
 
-| Métrica                         | Teto   |
-| ------------------------------- | ------ |
-| Carregamento inicial            | 1,5 MB |
-| Por rota (navegação interna)    | 1,2 MB |
-| Aviso para um chunk sob demanda | 0,4 MB |
+| Métrica                         | Teto   | O que ele responde                         |
+| ------------------------------- | ------ | ------------------------------------------ |
+| Carregamento inicial            | 1,5 MB | quanto custa ABRIR o app                   |
+| Por rota (navegação interna)    | 1,2 MB | quanto custa CHEGAR em cada tela           |
+| Aviso para um chunk sob demanda | 0,4 MB | o que está grande, mas corretamente adiado |
 
 Um teto que ninguém checa não é teto. Rode junto do `typecheck`, do lint e dos
-testes, e quebre o build.
+testes, e **quebre o build**.
+
+### 2.1 Meça por rota, não só o total
+
+O total sozinho esconde a regressão que importa. Ele mede o esqueleto que toda
+visita baixa; uma tela pode **dobrar de peso sem mexer nesse número**, porque o
+peso dela está num chunk que só desce quando alguém navega até lá. É por rota
+que uma dependência pesada entra sem ninguém ver.
+
+O caso real: uma tela de Ajustes passou de 1,08 para 1,24 MB — 15% num commit —
+porque um utilitário de exportação importava um compactador **no topo do
+arquivo**. Quem abria Ajustes para trocar o tema baixava a biblioteca inteira de
+gerar arquivo `.zip`. O total inicial não se mexeu um byte, e sem o teto por
+rota a regressão teria passado.
+
+### 2.2 A regra que evita 90% disso
+
+> Biblioteca que só serve **depois de um clique** entra por `await import()`
+> **dentro da função**, nunca no topo do arquivo.
+
+```ts
+// ✗ Todo mundo que abre a tela baixa o compactador.
+import JSZip from "jszip";
+export async function exportarTudo(itens) {
+  const zip = new JSZip();
+}
+
+// ✓ Só quem clica em "exportar" baixa.
+export async function exportarTudo(itens) {
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
+}
+```
+
+Vale para: compactador, gerador de PDF, captura de tela, confete, leitor de
+código de barras, reconhecimento de voz, editor de imagem, qualquer parser.
+
+### 2.3 Como achar o culpado de uma rota pesada
+
+1. Rode o build e leia o peso por rota (o script abaixo).
+2. Na rota estourada, liste os `import` do topo do arquivo da página.
+3. Pergunte de cada um: **isto é preciso antes de qualquer clique?** Se não, é
+   candidato a `await import()` ou a `next/dynamic`.
+4. Meça de novo. Uma dependência bem escolhida costuma valer 100–200 KB.
+
+O script é curto: o Next escreve, em `.next/app-build-manifest.json`, quais
+arquivos cada rota carrega. Somar os tamanhos desses arquivos é o peso da rota.
+Some `.next/static/chunks` para o carregamento inicial. Menos de cem linhas, sem
+dependência nenhuma, e é o que segura o app leve por anos.
 
 ---
 
@@ -139,6 +188,154 @@ componentes ao navegar: guardar em estado de componente é guardar em nada.
 Atualize a interface antes da resposta e guarde o valor anterior para desfazer
 em caso de erro. Vale para curtir, favoritar, renomear, arquivar — qualquer
 mudança pequena e reversível. Não vale para criar nem para pagar.
+
+### 4.5 O cache do ROTEADOR — a causa nº 1 de "tudo demora"
+
+Esta é, isolada, a diferença entre um app que parece nativo e um que parece um
+site. Se você só for aplicar uma regra deste documento inteiro, aplique esta.
+
+**O problema.** Num roteador moderno de React (o App Router do Next, e os
+equivalentes), navegar **destrói a árvore da rota anterior**. Sair da lista,
+abrir um item e voltar não devolve a tela de antes: monta tudo de novo, do zero.
+E como o padrão do Next 15+ é `staleTimes.dynamic = 0`, o payload da rota
+também não é reaproveitado — ele é buscado outra vez no servidor. O resultado é
+exatamente a queixa "abro, volto, e tenho que esperar de novo".
+
+**A correção, em duas camadas — e as duas são necessárias:**
+
+```ts
+// next.config.ts — camada 1: o roteador guarda a rota já buscada.
+experimental: {
+  staleTimes: { dynamic: 180, static: 300 },
+}
+```
+
+Não pesa nada: o que fica guardado é o resultado que o navegador **já** tinha
+baixado, na memória da própria aba, e some ao fechar. Três minutos cobre o
+vaivém real de quem usa o app; passado isso, busca de novo.
+
+```ts
+// camada 2: o SEU cache de dados vive num módulo, fora do React.
+const cache = new Map<string, Pagina>();
+```
+
+A camada 1 evita a ida ao servidor pelo _código e pelo payload_ da rota. A
+camada 2 evita a ida ao servidor pelos _dados_. Sem a 2, a rota volta instantânea
+e a lista dentro dela volta vazia — que é meio caminho e parece defeito.
+
+**Guarde TODAS as páginas roladas, não só a primeira.** Voltar para a lista
+depois de ter rolado até março e cair em janeiro é o mesmo defeito com outra
+cara.
+
+### 4.6 A janela de frescor: 20 segundos sem perguntar nada
+
+Ter cache não basta se toda montagem dispara a revalidação assim mesmo: a tela
+abre cheia, e um segundo depois pisca com a mesma resposta.
+
+> Se o que está guardado tem menos de **20 segundos**, não consulte nada.
+
+Vinte segundos é o tempo de abrir um item, ler e voltar. Menos que isso e a ida
+à rede volta a acontecer em toda navegação; mais e a lista começa a parecer
+velha para quem usa dois aparelhos.
+
+Duas janelas, com prazos diferentes:
+
+| O quê                     | Janela | Por quê                                           |
+| ------------------------- | ------ | ------------------------------------------------- |
+| Lista / tela              | 20 s   | é o vaivém de navegação                           |
+| Item individual (detalhe) | 60 s   | detalhe aberto e fechado não deve refazer a busca |
+
+**A exceção que não pode faltar:** quem **escreve** invalida a janela. Salvar um
+item acontece em outra rota, com a lista desmontada — nenhum componente estaria
+escutando. Por isso a assinatura é **do módulo**, não do componente:
+
+```ts
+// No repositório de dados, fora do React:
+inscrever(() => {
+  for (const [chave, pagina] of cache) cache.set(chave, { ...pagina, em: 0 });
+});
+```
+
+Sem isso, voltar para a lista nos 20 segundos seguintes a salvar mostra a lista
+de antes — sem a coisa que a pessoa acabou de criar. É pior do que lentidão.
+
+### 4.7 Não pinte o que não mudou
+
+A revalidação de fundo quase sempre devolve **exatamente** o que já está na
+tela. Trocar o estado assim mesmo faz a tela inteira renderizar de novo — e, se
+houver animação de transição, um fade da página um segundo depois de ela abrir.
+A pessoa lê isso como "recarregou".
+
+```ts
+const mesmaLista =
+  novos.length === atuaisRef.current.length &&
+  novos.every((e, i) => {
+    const atual = atuaisRef.current[i];
+    return atual?.id === e.id && atual?.atualizadoEm === e.atualizadoEm;
+  });
+
+if (mesmaLista) {
+  setCarregando(false); // só sai do esqueleto, se ainda estiver nele
+  return; // ninguém pinta nada
+}
+```
+
+Compare por **identidade + carimbo de atualização**, não por conteúdo inteiro:
+é O(n) e não depende de serializar objeto.
+
+### 4.8 Respostas fora de ordem
+
+Trocar de filtro depressa dispara buscas que voltam **fora de ordem**, e a mais
+lenta chega por último e pinta a lista dela por cima da tela que já mostra
+outro filtro. Duas guardas, e as duas são precisas:
+
+```ts
+const aindaVale = chaveDe(f) === chaveDe(filtroAtualRef.current);
+if (!aindaVale) return;                       // 1. não pinta
+// ...
+finally {
+  // 2. e também NÃO desliga o esqueleto do filtro que ainda está vindo
+  if (chaveDe(f) === chaveDe(filtroAtualRef.current)) setCarregando(false);
+}
+```
+
+Esquecer a segunda é sutil e apareceu em produção: a resposta obsoleta desligava
+o esqueleto do filtro novo, e a lista anterior ficava na tela sem sinal nenhum
+de carregamento — como se aquele fosse o resultado.
+
+### 4.9 Cuidado: Suspense recria efeitos
+
+Quando um componente carregado por `next/dynamic` suspende, o React **esconde a
+árvore e, ao mostrá-la de volta, recria os efeitos** — mantendo estado e refs.
+Todo `useEffect` daquele ramo roda de novo, com os refs no valor em que ficaram.
+
+Isso quebra qualquer guarda do tipo "só na primeira montagem" escrita com ref:
+
+```ts
+// ✗ Frágil: o ref já foi gasto, e o efeito roda de novo depois do Suspense.
+const primeiroRender = useRef(true);
+useEffect(() => {
+  if (primeiroRender.current) {
+    primeiroRender.current = false;
+    return;
+  }
+  animarSaida(); // dispara sem nunca ter havido entrada
+}, [aberto]);
+
+// ✓ Guarde o FATO, não a ordem.
+const jaAbriu = useRef(false);
+useEffect(() => {
+  if (aberto) {
+    jaAbriu.current = true;
+    return;
+  }
+  if (!jaAbriu.current) return; // nunca abriu: não há saída para animar
+  animarSaida();
+}, [aberto]);
+```
+
+O sintoma real disso: ao entrar numa tela cujo painel é dinâmico, dois diálogos
+fechados apareciam por meio segundo e sumiam.
 
 ---
 
@@ -245,6 +442,67 @@ O jitter não é enfeite: sem ele, mil clientes que falharam juntos voltam junto
 
 E **só repita erro de rede**. Repetir um 400 é repetir um erro seu.
 
+### 7.5 A promessa recusada que trava a tela para sempre
+
+A família de defeito mais comum num app assíncrono, e a mais difícil de
+enxergar em revisão: **um `await` fora do `try`**, entre ligar e desligar um
+estado de "ocupado".
+
+```ts
+// ✗ Se a promessa é recusada, `salvando` fica ligado PARA SEMPRE.
+setSalvando(true);
+await salvar(dados);
+setSalvando(false);
+
+// ✓
+setSalvando(true);
+try {
+  await salvar(dados);
+} finally {
+  setSalvando(false);
+}
+```
+
+O sintoma nunca é "deu erro": é um botão girando sem fim, um teclado inerte, uma
+frase de "confirmando…" que não sai da tela. A pessoa não vê defeito, vê
+lentidão — e é por isso que isto está no documento de desempenho.
+
+Uma busca mecânica acha quase todos:
+
+```
+set<Algo>(true) … await … set<Algo>(false)   sem try/catch/finally no meio
+```
+
+Os quatro lugares onde ele costuma se esconder:
+
+| Lugar                                     | O que fica preso                         |
+| ----------------------------------------- | ---------------------------------------- |
+| Conferência de senha/PIN                  | o teclado inteiro, e o conteúdo trancado |
+| Sair da conta                             | o botão girando, sessão em limbo         |
+| Espera por webhook depois de um pagamento | "confirmando…" sobre um plano já ativo   |
+| Salvar formulário                         | botão girando, sem mensagem nenhuma      |
+
+**A variante silenciosa** é pior: o `.then` que faz a fila andar.
+
+```ts
+// ✗ Se `criar` é recusada, `seguirParaOProximo` nunca roda.
+void criar(nome).then((feita) => {
+  aplicar(feita);
+  seguirParaOProximo();
+});
+
+// ✓ O `catch` ANTES do `then` mantém o fluxo andando.
+void criar(nome)
+  .catch(() => null)
+  .then((feita) => {
+    if (feita) aplicar(feita);
+    seguirParaOProximo();
+  });
+```
+
+Aqui não trava um botão: trava o **fluxo**. Um diálogo que não avança para a
+próxima pergunta, um assistente parado no passo 2, e nada no console.
+
 ---
 
 ## 8. Offline-first
@@ -270,6 +528,15 @@ Detalhes que evitam dor:
   Sem teto, o armazenamento cresce até o sistema apagar tudo de uma vez.
 - **Normalize a chave da imagem** removendo o token da URL assinada — senão cada
   assinatura nova vira uma entrada nova no cache.
+- **Cache-primeiro tem de ser cache-primeiro.** Montar o `fetch` antes do `if`
+  que decide a estratégia faz toda imagem já guardada disparar uma requisição
+  cujo resultado é descartado. Numa galeria são dezenas de idas à rede por
+  rolagem, gastando dado de quem está no 4G para rebaixar arquivos idênticos.
+  Monte a busca dentro de uma função e chame-a só no ramo que precisa dela.
+- **Rejeição pendurada.** Se a navegação tem prazo e cai para o cache, a
+  promessa de rede continua correndo e, ao falhar, vira `unhandled rejection`
+  dentro do service worker. Marque-a como tratada (`daRede.catch(() => {})`)
+  logo depois de criá-la.
 - **Pré-carregue** as rotas principais e uma página de "sem conexão".
 - Sirva o próprio arquivo do service worker com `Cache-Control: no-store`.
 - **Registre só em produção**, depois do `load`. Em desenvolvimento ele só
@@ -325,6 +592,46 @@ Faça isso num worker (§10).
 Assine **em lote** (até 100 por chamada), guarde em memória e em
 `sessionStorage`, e expire 60s antes do prazo real. Junte os pedidos do mesmo
 ciclo de render com `queueMicrotask` — a lista inteira vira uma chamada.
+
+**E dê segunda chance.** Este é um defeito que só aparece em produção e é
+insidioso: o efeito que assina roda quando a lista de caminhos visíveis muda. Se
+a assinatura falha — a sessão do backend ainda subindo no primeiro segundo, a
+rede piscando —, **nada muda depois**: nem os caminhos, nem o mapa de URLs. O
+efeito não roda de novo, e a grade fica em retângulos vazios até a pessoa
+recarregar a página. Trocar de aba "conserta", o que despista a investigação:
+não é o foco que arruma, é a revalidação trocando a lista.
+
+```ts
+const tentativas = useRef(0);
+const MAX = 5;
+
+const reagendar = () => {
+  if (tentativas.current >= MAX) return;
+  const espera = 400 * 2 ** tentativas.current; // 0,4s · 0,8 · 1,6 · 3,2 · 6,4
+  tentativas.current += 1;
+  timer = setTimeout(tentar, espera);
+};
+
+const tentar = () => {
+  void assinar(faltando).then(
+    (mapa) => {
+      if (!mapa.size) return reagendar();
+      tentativas.current = 0; // veio algo: o teto zera
+      acumularNoMapa(mapa);
+    },
+    () => reagendar(), // recusa também reagenda
+  );
+};
+```
+
+Duas sutilezas que fazem diferença: o teto zera **a cada resposta útil** (rolar
+uma galeria inteira não gasta o limite — ele é do trecho que está falhando, não
+da sessão), e o mapa **só cresce** (quem já foi assinado não é pedido de novo,
+então a lista virtualizada pede só o que entrou na tela).
+
+Ponha isso num hook único e use-o em toda tela que mostra imagem privada. Três
+telas fazendo a mesma coisa de três jeitos é como o defeito sobrevive: corrigido
+numa, continua nas outras.
 
 ---
 
@@ -401,6 +708,36 @@ pergunta até 4 mil). O limite de tamanho é limite de custo.
 - No `pointerenter`/`pointerdown` de um cartão, pré-carregue **a rota e o dado**.
   O intervalo entre passar o mouse e clicar é de graça.
 - `preconnect` + `dns-prefetch` para o domínio do backend, no `<head>`.
+
+### 11.5 O botão VOLTAR é o mais lento do app — e ninguém percebe
+
+Telas de tela cheia (criar, editar, ler) costumam **não ter a navegação do app**.
+Isso quer dizer que nada nelas chamou `prefetch` da tela de origem: o roteador
+só começa a buscar a rota de destino no instante do toque. Três segundos de
+botão parado, e a pessoa toca de novo.
+
+Duas linhas resolvem:
+
+```tsx
+// Ao MONTAR a tela cheia, a rota de volta já vai ficando pronta.
+useEffect(() => {
+  router.prefetch("/");
+}, [router]);
+```
+
+E o outro lado do mesmo problema: **um indicador de rota que só escuta clique em
+`<a>` não cobre botão nenhum.** Voltar quase sempre é um `<button>` chamando
+`router.back()`. Exponha um disparo manual e chame-o de dentro do botão:
+
+```ts
+export function comecarProgressoRota() {
+  window.dispatchEvent(new CustomEvent("progresso-rota"));
+}
+```
+
+Só acenda a barra quando o toque **de fato troca de rota**. Se ele apenas fecha
+um painel ou volta uma etapa dentro da mesma tela, a barra fica pendurada
+esperando uma navegação que não vem — e o indicador passa a mentir.
 
 ---
 
@@ -534,4 +871,58 @@ Antes de dar uma tela por pronta:
 - [ ] A tela tem estado de carregando com o **formato** do conteúdo.
 - [ ] O que falha por rede vai para a fila; o que falha por erro do cliente, não.
 - [ ] O cache tem chave que descreve o pedido e é limpo no logout.
-- [ ] O orçamento de bundle continua passando.
+- [ ] O orçamento de bundle continua passando — **por rota**, não só o total.
+- [ ] `staleTimes` do roteador está configurado; voltar não remonta a tela.
+- [ ] Existe janela de frescor (20 s), e escrever a invalida.
+- [ ] Revalidação que devolve o mesmo resultado **não** repinta a tela.
+- [ ] Resposta obsoleta não pinta nem desliga o esqueleto da atual.
+- [ ] Tela cheia faz `prefetch` da rota de volta ao montar.
+- [ ] Botão que navega acende o indicador de rota (link não é o único caminho).
+- [ ] Toda assinatura de URL tem repetição com espera dobrando.
+- [ ] Nenhuma promessa fica sem `catch` num caminho que desliga carregamento.
+
+---
+
+## 16. Diagnóstico: "o meu app demora para carregar as telas"
+
+Na ordem. Pare quando achar — os quatro primeiros respondem pela quase
+totalidade dos casos, e nenhum deles é "otimizar o React".
+
+**1. A navegação remonta tudo?**
+Abra uma tela, vá para outra e volte. Se voltar mostra esqueleto, o roteador
+está descartando a rota. → §4.5. É a correção de maior efeito e a mais barata:
+uma linha de configuração e um `Map` em módulo.
+
+**2. A tela abre cheia e "recarrega" um segundo depois?**
+Três causas, nesta ordem de frequência: revalidação repintando resultado
+idêntico (§4.7), o detalhe refazendo a busca a cada aviso do repositório (§4.6,
+janela de 60 s), e transição de view rodando em toda revalidação (§4.7).
+
+**3. Quanto pesa a ROTA, não o app?**
+Meça por rota (§2.1). Um único `import` no topo de um arquivo pode custar
+200 KB numa tela que nunca usa aquilo. → §2.2.
+
+**4. O primeiro toque de cada sessão demora?**
+Alguma checagem síncrona de servidor está no caminho do clique — permissão,
+plano, sessão. Leia do espelho local (síncrono) para decidir a interface, e
+confirme com o servidor atrás. Guarde a última confirmação por 60 s.
+
+**5. A lista trava ao rolar ou ao digitar?**
+Virtualize (§5.1) e isole o campo (§6.1). Nessa ordem: virtualizar resolve a
+rolagem, isolar resolve a digitação, e um não substitui o outro.
+
+**6. As imagens chegam tarde ou não chegam?**
+Miniatura própria (§9.1), tamanho declarado (§9.2), e **repetição na
+assinatura**: se a URL assinada falha porque a sessão ainda está subindo, nada
+muda depois e a foto fica em branco até recarregar. Reagende com espera
+dobrando.
+
+**7. Só então**: profile de render, memoização, workers.
+
+### O erro de método mais comum
+
+Otimizar o que é fácil de medir (o tamanho do JavaScript) em vez do que a pessoa
+sente (o tempo entre o toque e a tela). Um app com 400 KB que remonta a tela a
+cada navegação parece mais lento do que um de 1,2 MB que devolve a tela pronta.
+**Meça o vaivém real**: abra a lista, entre num item, volte, entre em outro,
+volte. É esse ciclo que define a impressão de velocidade.
