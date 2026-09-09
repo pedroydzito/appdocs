@@ -503,6 +503,34 @@ void criar(nome)
 Aqui não trava um botão: trava o **fluxo**. Um diálogo que não avança para a
 próxima pergunta, um assistente parado no passo 2, e nada no console.
 
+### 7.6 O `await` que devolve depois de a tela morrer
+
+Todo recurso de aparelho — microfone, câmera, geolocalização, sensor — é
+pedido com uma promessa que pode demorar **o tempo de a pessoa ler um diálogo
+de permissão**. Nesse intervalo ela pode sair da tela. E aí:
+
+```ts
+// ✗ A limpeza do efeito já rodou, com o ref ainda vazio. O microfone fica
+//   ligado, com o ponto vermelho do sistema aceso, até fechar a aba.
+const fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
+trilhasRef.current = fluxo.getTracks();
+
+// ✓
+const fluxo = await navigator.mediaDevices.getUserMedia({ audio: true });
+if (desmontadoRef.current) {
+  fluxo.getTracks().forEach((t) => t.stop());
+  return;
+}
+trilhasRef.current = fluxo.getTracks();
+```
+
+A regra geral: **depois de todo `await` que devolve um recurso, pergunte se a
+tela ainda existe** — e, se não existir, devolva o recurso ali mesmo. A limpeza
+do `useEffect` não alcança o que ainda não tinha nascido quando ela rodou.
+
+Vale igual para `MediaRecorder` (parar o gravador, não só as trilhas),
+`AudioContext` (fechar), `WakeLock` (liberar) e handles do sistema de arquivos.
+
 ---
 
 ## 8. Offline-first
@@ -632,6 +660,48 @@ então a lista virtualizada pede só o que entrou na tela).
 Ponha isso num hook único e use-o em toda tela que mostra imagem privada. Três
 telas fazendo a mesma coisa de três jeitos é como o defeito sobrevive: corrigido
 numa, continua nas outras.
+
+### 9.4 `createObjectURL` é alocação: alguém precisa revogar
+
+`URL.createObjectURL(blob)` prende o blob na memória do documento **até alguém
+chamar `revokeObjectURL`**. Não há coleta de lixo para isso: a URL é uma
+referência forte, e o navegador não sabe que você parou de usá-la.
+
+Duas regras, e as duas foram aprendidas do jeito caro:
+
+**1. Cache de URL nunca sobrescreve sem revogar.**
+
+```ts
+// ✗ Cada gravação por cima deixa o blob anterior vivo até a aba fechar.
+cache.set(caminho, URL.createObjectURL(blob));
+
+// ✓ Uma função, e todo mundo passa por ela.
+function guardarUrlDeBlob(caminho: string, blob: Blob): string {
+  const anterior = cache.get(caminho);
+  if (anterior?.startsWith("blob:")) URL.revokeObjectURL(anterior);
+  const url = URL.createObjectURL(blob);
+  cache.set(caminho, url);
+  return url;
+}
+```
+
+O sintoma é o pior possível de diagnosticar: a aba vai ficando pesada ao longo
+da sessão, sem nenhum pico, sem nenhum erro. Numa lista de avatares
+pré-carregada a cada visita, são megabytes por sessão.
+
+**2. A prévia local sai quando a definitiva entra — nem antes.**
+
+Ao subir uma imagem, o padrão é mostrar um `blob:` local enquanto a rede
+trabalha. O erro é revogá-lo no `finally` do upload: o caminho novo já está no
+estado, mas a **URL assinada** dele ainda não chegou, e a imagem pisca para o
+placeholder no meio.
+
+Duas formas corretas, dependendo do caso:
+
+- Guarde na prévia o caminho que ela virou, e **descarte-a quando a lista do
+  servidor contiver esse caminho** — a troca acontece no mesmo render, sem vão.
+- Ou, no caso simples de um avatar só, adie a revogação por um quadro
+  (`requestAnimationFrame`), para o novo `src` já ter sido pintado.
 
 ---
 
@@ -880,6 +950,10 @@ Antes de dar uma tela por pronta:
 - [ ] Botão que navega acende o indicador de rota (link não é o único caminho).
 - [ ] Toda assinatura de URL tem repetição com espera dobrando.
 - [ ] Nenhuma promessa fica sem `catch` num caminho que desliga carregamento.
+- [ ] Todo `createObjectURL` tem dono: o cache revoga antes de sobrescrever, e a
+      prévia local só é revogada quando a definitiva já está na tela.
+- [ ] Depois de todo `await` que devolve um recurso do aparelho, há a pergunta
+      "a tela ainda existe?" — e a devolução do recurso se ela não existir.
 
 ---
 

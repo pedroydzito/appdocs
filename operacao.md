@@ -751,6 +751,56 @@ levar embora, ou sumir.
 - **Backup do banco**: confira que o plano contratado faz backup automático e,
   mais importante, **teste uma restauração** antes de precisar dela.
 
+### 17.1 Exportar não é o mesmo que fazer backup
+
+Confundir os dois produz um dos erros mais silenciosos que existem, e vale
+separar antes de escrever o primeiro deles:
+
+|                    | Exportar                          | Backup                               |
+| ------------------ | --------------------------------- | ------------------------------------ |
+| Para que serve     | ler, imprimir, guardar noutro app | restaurar a conta                    |
+| Quem lê            | uma pessoa                        | o próprio app                        |
+| Formato            | Markdown, PDF, HTML               | JSON completo, opcionalmente cifrado |
+| Conteúdo protegido | **respeita a proteção**           | vai inteiro                          |
+| Perder um campo    | aceitável                         | **quebra a restauração**             |
+
+A linha que importa é a penúltima. Se o app tem qualquer conteúdo que a
+interface trata como protegido — trancado por senha, marcado como privado —, a
+**exportação legível** tem de respeitar isso, e o **backup** não pode. Um
+backup que perde conteúdo não restaura nada; uma exportação que despeja o
+conteúdo trancado quebra a única promessa que aquele cadeado fazia.
+
+Escreva os dois motivos em comentário, junto do código, para ninguém
+"corrigir" um deles achando que é inconsistência.
+
+### 17.2 Montar HTML na mão? Escape.
+
+A exportação para impressão costuma montar HTML por concatenação, e é o único
+lugar do app moderno onde isso ainda acontece — os componentes escapam sozinhos,
+esta função não.
+
+```ts
+// Texto puro virando conteúdo de HTML. O `&` primeiro, senão as entidades
+// recém-criadas viram "&amp;amp;".
+const escaparHtml = (t: string) =>
+  t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+```
+
+O que precisa passar por ela: título, rótulo, nome de categoria, nome de
+pessoa — tudo que é **texto puro**. O corpo do conteúdo, se já é HTML saneado
+na gravação, entra inteiro (é ele que carrega os parágrafos).
+
+E lembre que a janela aberta com `window.open("")` herda a **sua origem**: o que
+entra ali executa como se fosse o app. Não é "só um preview".
+
+Duas outras coisas que essa janela costuma esquecer:
+
+- **Pop-up bloqueado** devolve `null`. Sem tratar, o botão simplesmente não faz
+  nada e não há como a pessoa descobrir por quê. Diga.
+- **A data do conteúdo é a que a pessoa declarou**, não a de criação do
+  registro. Quem escreve de madrugada, ou data o item para ontem, recebia o dia
+  errado impresso.
+
 ---
 
 ## 18. Checklist de lançamento
@@ -767,7 +817,10 @@ levar embora, ou sumir.
 - [ ] Service worker registrado só em produção, com versão e página offline.
 - [ ] Instalado no celular: ícone certo, sem barra de navegador, áreas seguras
       respeitadas, funciona em modo avião.
-- [ ] CI verde nos seis passos, orçamento de bundle dentro do teto.
+- [ ] CI verde nos seis passos, orçamento de bundle dentro do teto — por rota.
+- [ ] Exportação legível respeita o que a interface diz estar protegido; o
+      backup vai inteiro, e os dois motivos estão em comentário (§17.1).
+- [ ] HTML montado à mão escapa o texto puro que entra nele (§17.2).
 - [ ] HTTPS, domínio canônico definido.
 - [ ] Métricas de campo chegando; log sem campo proibido.
 - [ ] Exportar, importar e apagar a conta funcionam.

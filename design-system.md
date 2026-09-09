@@ -1674,6 +1674,57 @@ Três ferramentas, nesta ordem de preferência: esqueleto com o formato do
 conteúdo → `TrocaSuave` (crossfade de 180ms entre esqueleto e conteúdo) →
 indicador girando (só quando não dá para prever o formato).
 
+A roda girando é a terceira opção, não a primeira. **Se você sabe que vem uma
+lista de cartões, desenhe cartões cinzas** — a tela não muda de forma quando o
+conteúdo chega, e a espera fica menor porque o olho já tem onde pousar. Uma
+tela do app de referência tinha ficado com o único giro do produto inteiro, e
+ele destoava por ser o único que não dizia o que vinha depois.
+
+### 10.7 Vazio: são DOIS, e quase sempre um está esquecido
+
+Toda tela com lista tem dois estados vazios, e eles dizem coisas diferentes:
+
+| Qual                   | O que a pessoa fez | O que a tela diz                     |
+| ---------------------- | ------------------ | ------------------------------------ |
+| **Nunca teve nada**    | chegou agora       | o que isto é, e o botão para começar |
+| **O filtro não achou** | buscou ou filtrou  | não achei isso — e nada mais         |
+
+O primeiro é um convite e leva ação. O segundo é uma resposta e **não** leva
+ação: oferecer "criar" para quem acabou de buscar é responder outra pergunta.
+
+O erro que se repete: o primeiro vira `<EstadoVazio>` e o segundo, por ser "só
+uma frase", nasce à mão — e a mesma tela passa a ter duas linguagens a dois
+`else` de distância. Os dois usam o componente.
+
+### 10.8 Uma promessa da interface vale em TODOS os caminhos de saída
+
+A regra mais fácil de quebrar sem perceber, porque cada caminho é escrito num
+dia diferente.
+
+Se a interface promete que um conteúdo está protegido — uma entrada trancada
+por senha, um item marcado como privado, um campo escondido —, essa promessa
+precisa valer em **cada lugar por onde o conteúdo sai**:
+
+- a prévia no cartão da lista
+- a busca (inclusive a indexação para busca semântica)
+- o que é mandado a um modelo de IA
+- a exportação legível (texto, PDF, ZIP)
+- a impressão
+- o link público de leitura
+- a notificação
+
+No app de referência, os cinco primeiros estavam corretos — com comentários
+explicando o cuidado — e a **exportação** ficou de fora por meses. É o caminho
+que produz um arquivo para guardar em qualquer lugar ou mandar para uma
+gráfica, ou seja, exatamente o pior lugar para o furo estar.
+
+Faça a lista dos caminhos de saída **uma vez**, escreva-a no código junto do
+estado que protege, e confira-a inteira toda vez que um caminho novo nascer.
+
+A exceção legítima é o **backup**: ele é arquivo de restauração, não de leitura,
+e um backup que perde conteúdo não restaura nada. Diga isso no comentário, para
+ninguém "corrigir" depois.
+
 ---
 
 ## 11. Gestos
@@ -1853,3 +1904,7 @@ Antes de dar uma tela por pronta:
 - [ ] Estado vazio usa o componente — inclusive o "nada encontrado" do filtro,
       que é o que mais escapa (a mesma tela costuma ter dois).
 - [ ] Nenhum bloco de classes repetido três vezes (ver §8.0).
+- [ ] Os DOIS vazios da tela existem e usam o componente (§10.7).
+- [ ] Carregamento tem o formato do conteúdo; a roda girando é a terceira opção.
+- [ ] Todo caminho de saída respeita o que a interface diz estar protegido
+      (§10.8) — lista, busca, IA, exportação, impressão, link público.
