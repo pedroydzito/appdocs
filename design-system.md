@@ -86,7 +86,8 @@ classes:
 
 ```js
 var escuro =
-  salvo === "escuro" || (salvo === "sistema" && matchMedia("(prefers-color-scheme: dark)").matches);
+  salvo === "escuro" ||
+  (salvo === "sistema" && matchMedia("(prefers-color-scheme: dark)").matches);
 raiz.classList.toggle("dark", escuro);
 raiz.style.colorScheme = escuro ? "dark" : "light";
 raiz.classList.toggle("contraste-alto", contraste === "alto");
@@ -220,8 +221,10 @@ vista e é o que dá ar de template genérico.
   --texto-3: #6b645b;
 
   --sombra-baixa: 0 1px 2px rgb(22 19 15 / 0.04);
-  --sombra: 0 1px 2px rgb(22 19 15 / 0.04), 0 4px 16px -6px rgb(22 19 15 / 0.08);
-  --sombra-alta: 0 2px 4px rgb(22 19 15 / 0.05), 0 12px 32px -8px rgb(22 19 15 / 0.16);
+  --sombra:
+    0 1px 2px rgb(22 19 15 / 0.04), 0 4px 16px -6px rgb(22 19 15 / 0.08);
+  --sombra-alta:
+    0 2px 4px rgb(22 19 15 / 0.05), 0 12px 32px -8px rgb(22 19 15 / 0.16);
 
   --perigo: #f43a2b;
   --perigo-tenue: rgb(244 58 43 / 0.1);
@@ -829,8 +832,12 @@ duas brigam.
      animation: none;
      mix-blend-mode: normal;
    }
-   html[data-transicao="onda"]::view-transition-old(root) { z-index: 0; }
-   html[data-transicao="onda"]::view-transition-new(root) { z-index: 1; }
+   html[data-transicao="onda"]::view-transition-old(root) {
+     z-index: 0;
+   }
+   html[data-transicao="onda"]::view-transition-new(root) {
+     z-index: 1;
+   }
    ```
 
    A foto antiga fica parada embaixo, inteira, e a nova é revelada **só** pelo
@@ -855,7 +862,8 @@ O que o CSS não alcança passa por um guarda único:
 ```ts
 export function querMenosMovimento() {
   return (
-    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
 }
 ```
@@ -933,6 +941,156 @@ e o morph do gráfico.
 
 ---
 
+### 6.6 Catálogo completo de `@keyframes`
+
+Esta é a lista inteira, sem resumo: os quadros de cada animação, o seletor que a
+dispara e o atalho `animation` com que ela é chamada. Quem estiver reconstruindo
+o app noutro projeto copia daqui — não precisa adivinhar duração, curva nem
+`fill-mode`.
+
+Três convenções valem para todas:
+
+- **`both` / `backwards` quase sempre.** Sem `backwards`, o elemento pisca no
+  estado final por um quadro antes de a animação começar — o defeito é sutil e
+  aparece justo nas listas encadeadas, onde há atraso.
+- **Entrada usa `var(--curva)`; saída usa `var(--curva-saida)`.** Quando a
+  duração é escrita em segundos (`0.4s`) e não em milissegundos, é código
+  antigo: o valor está certo, a unidade é que não foi normalizada.
+- **Nada aqui roda sob movimento reduzido** — o interruptor de §6.5 zera a
+  duração de tudo.
+
+**Entrada de conteúdo**
+
+| `@keyframes`            | Quadros                                                                                                                           | Quem usa, e com que atalho                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `surgir`                | `from` opacity: 0; transform: translateY(10px) → `to` opacity: 1; transform: none                                                 | `.animar-surgir` — `surgir 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards` <br> `.animar-barra-ancorada` — `surgir-baixo 200ms var(--curva) both` <br> `.retrospectiva-slide[data-visivel="1"] [data-slide-entra]` — `surgir 0.7s var(--curva) backwards` <br> `.retrospectiva-slide[data-visivel="1"] .moodboard > *` — `surgir 0.5s var(--curva) backwards` |
+| `fadeIn`                | `from` opacity: 0 → `to` opacity: 1                                                                                               | `.animar-fade-in` — `fadeIn 0.2s ease-out both`                                                                                                                                                                                                                                                                                                             |
+| `surgirBaixo`           | `from` opacity: 0; transform: translateY(10px) scale(0.95) → `to` opacity: 1; transform: translateY(0) scale(1)                   | `.animar-surgir-baixo` — `surgirBaixo 0.2s cubic-bezier(0.16, 1, 0.3, 1) backwards`                                                                                                                                                                                                                                                                         |
+| `surgir-baixo`          | `from` opacity: 0; transform: translateY(100%) → `to` opacity: 1; transform: none                                                 | chamado inline / por JS                                                                                                                                                                                                                                                                                                                                     |
+| `revelar`               | `from` opacity: 0; transform: translateY(10px) → `to` opacity: 1; transform: none                                                 | `.revela-ao-rolar` — `revelar 340ms cubic-bezier(0.16, 1, 0.3, 1) both`                                                                                                                                                                                                                                                                                     |
+| `entrar-tela`           | `from` opacity: 0; transform: translateY(8px) → `to` opacity: 1; transform: none                                                  | `.animar-tela` — `entrar-tela 180ms var(--curva) both` <br> `.animar-tela-voltando` — `entrar-tela-voltando 200ms var(--curva) both` <br> `.entra-escalonado` — `entrar-tela 300ms cubic-bezier(0.16, 1, 0.3, 1) both` <br> `.entra-cascata` — `entrar-tela 400ms cubic-bezier(0.16, 1, 0.3, 1) both`                                                       |
+| `entrar-tela-voltando`  | `from` opacity: 0; transform: translateX(-14px) → `to` opacity: 1; transform: none                                                | chamado inline / por JS                                                                                                                                                                                                                                                                                                                                     |
+| `entrar-encadeado`      | `from` opacity: 0; transform: translateY(10px) → `to` opacity: 1; transform: none                                                 | `.animar-tela [data-encadeado], .animar-tela-voltando [data-encadeado]` — `entrar-encadeado 280ms var(--curva) backwards` <br> `.animar-tela-voltando [data-encadeado]` — `entrar-encadeado-lado` <br> `.abertura-diaria [data-encadeado]` — `entrar-encadeado 520ms var(--curva) backwards`                                                                |
+| `entrar-encadeado-lado` | `from` opacity: 0; transform: translateX(-12px) → `to` opacity: 1; transform: none                                                | chamado inline / por JS                                                                                                                                                                                                                                                                                                                                     |
+| `entrar-item-comando`   | `from` opacity: 0; transform: translateY(-6px)                                                                                    | `[cmdk-item]` — `entrar-item-comando 200ms var(--curva) both`                                                                                                                                                                                                                                                                                               |
+| `nascer-barra`          | `from` opacity: 0; transform: scale(0.9) translateY(4px) → `to` opacity: 1; transform: none                                       | `.animar-barra` — `nascer-barra 160ms var(--curva) both`                                                                                                                                                                                                                                                                                                    |
+| `titulo-crescendo`      | `from` opacity: 0; transform: scale(0.9) translateY(6px) → `to` opacity: 1; transform: none                                       | `.titulo-crescendo` — `titulo-crescendo 300ms var(--curva) both`                                                                                                                                                                                                                                                                                            |
+| `assentar-bloco`        | `from` opacity: 0; transform: translateY(4px) → `to` opacity: 1; transform: translateY(0)                                         | `.texto-assentando .ProseMirror > *` — `assentar-bloco 320ms var(--curva) both`                                                                                                                                                                                                                                                                             |
+| `nascer-entrada`        | `from` opacity: 0; transform: translateY(14px) → `to` opacity: 1; transform: none                                                 | `.animar-nascimento` — `nascer-entrada 420ms var(--curva) both`                                                                                                                                                                                                                                                                                             |
+| `halo-nascimento`       | `from` box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-acento-500) 45%, transparent) → `to` box-shadow: 0 0 0 26px transparent | `.animar-nascimento::after` — `halo-nascimento 900ms var(--curva) 220ms both`                                                                                                                                                                                                                                                                               |
+
+**Saída e descarte**
+
+| `@keyframes`           | Quadros                                                                                                                                                                               | Quem usa, e com que atalho                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `sumir`                | `to` opacity: 0                                                                                                                                                                       | `.animar-fade-out` — `sumir 160ms var(--curva-saida) both`                        |
+| `dissolver`            | `to` opacity: 0; filter: blur(3px); transform: scale(0.96)                                                                                                                            | `.dissolvendo` — `dissolver 380ms var(--curva) forwards`                          |
+| `fechar-espaco`        | `from` max-height: 420px; opacity: 1 → `to` max-height: 0; opacity: 0; transform: scale(0.96); padding-top: 0; padding-bottom: 0; margin-bottom: 0; border-width: 0                   | `[data-saindo="1"]` — `fechar-espaco 320ms var(--curva) forwards`                 |
+| `voltar-para-o-diario` | `from` max-height: 420px; opacity: 1 → `to` max-height: 0; opacity: 0; transform: translateY(-14px) scale(1.03); padding-top: 0; padding-bottom: 0; margin-bottom: 0; border-width: 0 | `[data-saindo="restaurado"]` — `voltar-para-o-diario 320ms var(--curva) forwards` |
+| `encolher-entrada`     | `to` transform: scale(0.62); opacity: 0.6                                                                                                                                             | `.cabecalho-entrada` — `encolher-entrada linear both`                             |
+
+**Folha, menu e aviso**
+
+| `@keyframes`          | Quadros                                                                                                                                                 | Quem usa, e com que atalho                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `folha-sobe`          | `from` opacity: 0; transform: translateY(100%) → `to` opacity: 1; transform: none                                                                       | `.folha-abrindo` — `folha-sobe 280ms cubic-bezier(0.16, 1, 0.3, 1) backwards`    |
+| `folha-desce`         | `from` opacity: 1; transform: none → `to` opacity: 0; transform: translateY(100%)                                                                       | `.folha-fechando` — `folha-desce 200ms var(--curva-saida) both`                  |
+| `folha-aparece`       | `from` opacity: 0; transform: translateY(10px) → `to` opacity: 1; transform: none                                                                       | `.folha-abrindo` — `folha-aparece 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards` |
+| `folha-some`          | `from` opacity: 1; transform: none → `to` opacity: 0; transform: translateY(10px)                                                                       | `.folha-fechando` — `folha-some 160ms var(--curva-saida) both`                   |
+| `subir-folha`         | `from` opacity: 0; transform: translateY(24px) scale(0.985) → `to` opacity: 1; transform: none                                                          | `.animar-folha` — `subir-folha 240ms var(--curva) both`                          |
+| `brotar-do-canto`     | `from` opacity: 0; transform: scale(0.82) translateY(8px) → `to` opacity: 1; transform: none                                                            | `.brota-do-botao` — `brotar-do-canto 200ms var(--curva) both`                    |
+| `voltar-para-o-canto` | `from` opacity: 1; transform: none → `to` opacity: 0; transform: scale(0.86) translateY(6px)                                                            | `.volta-para-o-botao` — `voltar-para-o-canto 150ms var(--curva-saida) both`      |
+| `abrir-espaco-aviso`  | `from` max-height: 0; margin-top: -0.5rem; opacity: 0; transform: translateY(10px) → `to` max-height: 20rem; margin-top: 0; opacity: 1; transform: none | `.aviso-abrindo` — `abrir-espaco-aviso 260ms var(--curva) both`                  |
+
+**Estados vivos (repetem)**
+
+| `@keyframes`      | Quadros                                                                                                                                                                                                                                                                                                                                                   | Quem usa, e com que atalho                                                                      |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `pulsar-suave`    | `0%, 100%` opacity: 1 → `50%` opacity: 0.4                                                                                                                                                                                                                                                                                                                | `.animar-pulsar` — `pulsar-suave 1.8s ease-in-out infinite`                                     |
+| `digitando`       | `0%, 60%, 100%` transform: translateY(0); opacity: 0.45 → `30%` transform: translateY(-4px); opacity: 1                                                                                                                                                                                                                                                   | `.animar-digitando` — `digitando 1.1s ease-in-out infinite`                                     |
+| `ponto-salvando`  | `50%` opacity: 0.35; transform: scale(0.72)                                                                                                                                                                                                                                                                                                               | `.ponto-salvando` — `ponto-salvando 1.6s ease-in-out infinite`                                  |
+| `brilho`          | `100%` transform: translateX(100%)                                                                                                                                                                                                                                                                                                                        | `.esqueleto::after` — `brilho 1.6s infinite`                                                    |
+| `girar-anel`      | `to` transform: rotate(1turn)                                                                                                                                                                                                                                                                                                                             | `.anel-trabalho` — `girar-anel 1.15s linear infinite`                                           |
+| `correr-listras`  | `to` background-position-x: -1.75rem                                                                                                                                                                                                                                                                                                                      | `.barra-viva` — `correr-listras 800ms linear infinite`                                          |
+| `correr-fio`      | `from` transform: translateX(-100%) → `to` transform: translateX(300%)                                                                                                                                                                                                                                                                                    | `.fio-subindo::after` — `correr-fio 1.1s var(--curva) infinite`                                 |
+| `queimar`         | `0%, 100%` transform: scale(1) rotate(0deg) → `25%` transform: scale(calc(1 + var(--forca, 0.3) _ 0.14)) rotate(calc(var(--forca, 0.3) _ -4deg)) → `50%` transform: scale(calc(1 + var(--forca, 0.3) _ 0.06)) rotate(calc(var(--forca, 0.3) _ 3deg)) → `75%` transform: scale(calc(1 + var(--forca, 0.3) _ 0.11)) rotate(calc(var(--forca, 0.3) _ -2deg)) | `.chama` — `queimar calc(2.4s - var(--forca, 0.3) * 1.2s) ease-in-out infinite`                 |
+| `onda-respirando` | `50%` filter: brightness(1.12)                                                                                                                                                                                                                                                                                                                            | `.onda-tocando` — `onda-respirando 2.4s ease-in-out infinite`                                   |
+| `pulso-anel`      | `from` transform: scale(1); opacity: 0.45 → `to` transform: scale(1.55); opacity: 0                                                                                                                                                                                                                                                                       | `.retrospectiva-slide[data-visivel="1"] .anel-emocao` — `pulso-anel 2.4s var(--curva) infinite` |
+| `pull-elastica`   | `0%, 100%` transform: scale(1) → `50%` transform: scale(1.08)                                                                                                                                                                                                                                                                                             | `.pull-indicador-pronto` — `pull-elastica 600ms var(--curva) infinite`                          |
+| `piscar-cursor`   | `50%` border-color: transparent                                                                                                                                                                                                                                                                                                                           | `.link-digitando` — `piscar-cursor 700ms step-end infinite`                                     |
+
+**Confirmação e reação pontual**
+
+| `@keyframes`        | Quadros                                                                                                                                                                                       | Quem usa, e com que atalho                                                                 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `pulso-salvo`       | `0%` transform: scale(0.86) → `55%` transform: scale(1.1) → `100%` transform: scale(1)                                                                                                        | `.animar-salvo` — `pulso-salvo 420ms var(--curva)`                                         |
+| `riscar-tique`      | `from` stroke-dashoffset: 26 → `to` stroke-dashoffset: 0                                                                                                                                      | `.animar-tique path, .animar-tique polyline` — `riscar-tique 320ms var(--curva) 80ms both` |
+| `destaqueFavorito`  | `0%` transform: scale(1) → `50%` transform: scale(1.4) → `100%` transform: scale(1)                                                                                                           | `.animar-destaque-favorito` — `destaqueFavorito 0.3s cubic-bezier(0.16, 1, 0.3, 1) both`   |
+| `encher-estrela`    | `from` clip-path: inset(100% 0 0 0) → `to` clip-path: inset(0 0 0 0)                                                                                                                          | `.estrela-enchendo` — `encher-estrela 320ms var(--curva) both`                             |
+| `respirar-contador` | `40%` transform: scale(1.16); color: var(--acento-texto) → `100%` transform: none                                                                                                             | `.respira-contador` — `respirar-contador 620ms var(--curva)`                               |
+| `rolar-digito`      | `from` transform: translateY(0.55em); opacity: 0 → `to` transform: translateY(0); opacity: 1                                                                                                  | `.digito-rolando` — `rolar-digito var(--tempo-rapido) var(--curva)`                        |
+| `chip-chegando`     | `from` opacity: 0; transform: translateY(0.3em) scale(0.8) → `60%` transform: translateY(0) scale(1.06) → `to` opacity: 1; transform: translateY(0) scale(1)                                  | `.chip-chegando` — `chip-chegando 280ms var(--curva) both`                                 |
+| `girar-completando` | `from` rotate: 0deg → `to` rotate: 360deg                                                                                                                                                     | `.girar-parando` — `girar-completando 620ms cubic-bezier(0.16, 1, 0.3, 1) both`            |
+| `tremer`            | `10%, 90%` transform: translateX(-3px) → `20%, 80%` transform: translateX(5px) → `30%, 50%, 70%` transform: translateX(-7px) → `40%, 60%` transform: translateX(7px) → `100%` transform: none | chamado inline / por JS                                                                    |
+| `eco-dia`           | `from` opacity: 0.7; transform: scale(0.6) → `to` opacity: 0; transform: scale(2.6)                                                                                                           | `.eco-dia` — `eco-dia 620ms var(--curva) both`                                             |
+
+**Dados entrando**
+
+| `@keyframes`          | Quadros                                                                                                                                                                                                                        | Quem usa, e com que atalho                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `crescer-da-base`     | `from` transform: scaleY(0) → `to` transform: scaleY(1)                                                                                                                                                                        | `.barra-cresce` — `crescer-da-base 520ms var(--curva) both` <br> `.retrospectiva-slide[data-visivel="1"] .ritmo-barra` — `crescer-da-base 700ms var(--curva) backwards`              |
+| `crescer-da-esquerda` | `from` transform: scaleX(0) → `to` transform: scaleX(1)                                                                                                                                                                        | `.retrospectiva-slide[data-visivel="1"] .mapa-barra` — `crescer-da-esquerda 600ms var(--curva) backwards`                                                                            |
+| `assentar-barra`      | `from` transform: scaleX(0) → `to` transform: scaleX(1)                                                                                                                                                                        | `.barra-assenta` — `assentar-barra 620ms var(--curva) both`                                                                                                                          |
+| `acender-dia`         | `from` opacity: 0; transform: scale(0.4)                                                                                                                                                                                       | `.dia-acende` — `acender-dia 260ms var(--curva) both`                                                                                                                                |
+| `tag-caindo`          | `from` opacity: 0; transform: translateY(-8px) scale(0.86)                                                                                                                                                                     | `.tag-caindo` — `tag-caindo 320ms var(--curva) both`                                                                                                                                 |
+| `encher-barrinha`     | `from` transform: scaleX(0); opacity: 0.3 → `to` transform: scaleX(1); opacity: 1                                                                                                                                              | `.barrinha-enchendo` — `encher-barrinha 260ms var(--curva) both`                                                                                                                     |
+| `riscar-ano`          | `from` stroke-dashoffset: 900 → `to` stroke-dashoffset: 0                                                                                                                                                                      | `.ano-contorno` — `riscar-ano 2600ms var(--curva) both`                                                                                                                              |
+| `preencher-ano`       | `from` opacity: 0 → `to` opacity: 1                                                                                                                                                                                            | `.ano-preenchido` — `preencher-ano 260ms var(--curva) 2200ms both` <br> `.retrospectiva-slide[data-visivel="1"] .ponto-adiante` — `preencher-ano 280ms var(--curva) 1100ms forwards` |
+| `riscar-caminho`      | `to` stroke-dashoffset: 0                                                                                                                                                                                                      | `.retrospectiva-slide[data-visivel="1"] .caminho-adiante` — `riscar-caminho 1400ms var(--curva) forwards`                                                                            |
+| `onda-abrindo`        | `from` opacity: 0; transform: scaleY(0.6); clip-path: inset(0 100% 0 0) → `to` opacity: 1; transform: scaleY(1); clip-path: inset(0 0 0 0)                                                                                     | `.onda-abrindo` — `onda-abrindo 520ms var(--curva) both`                                                                                                                             |
+| `pintar-marca`        | `from` background-size: 0% 100% → `to` background-size: 100% 100%                                                                                                                                                              | `.ProseMirror mark` — `pintar-marca 320ms var(--curva) both`                                                                                                                         |
+| `citacao-aparece`     | `0%` background-color: color-mix(in srgb, var(--color-acento-500) 28%, transparent); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-acento-500) 35%, transparent) → `100%` background-color: transparent; box-shadow: none | `.citacao-entrada` — `citacao-aparece 1.2s var(--curva) both`                                                                                                                        |
+
+**Travessia lateral**
+
+| `@keyframes`           | Quadros                                                                                                                | Quem usa, e com que atalho                                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `painel-sai-esquerda`  | `from` opacity: 1; transform: translateX(0) → `to` opacity: 0; transform: translateX(calc(-56px \* var(--sentido, 1))) | `.troca-painel-saindo` — `painel-sai-esquerda 200ms var(--curva-saida) both`                                                                           |
+| `painel-entra-direita` | `from` opacity: 0; transform: translateX(calc(56px \* var(--sentido, 1))) → `to` opacity: 1; transform: none           | `.painel-aba-entrando` — `painel-entra-direita 260ms var(--curva) both` <br> `.troca-painel-entrando` — `painel-entra-direita 260ms var(--curva) both` |
+| `mes-da-direita`       | `from` opacity: 0; transform: translateX(28px)                                                                         | `.entra-da-direita` — `mes-da-direita 220ms var(--curva) both`                                                                                         |
+| `mes-da-esquerda`      | `from` opacity: 0; transform: translateX(-28px)                                                                        | `.entra-da-esquerda` — `mes-da-esquerda 220ms var(--curva) both`                                                                                       |
+| `bolha-minha`          | `from` opacity: 0; transform: translateY(10px) scale(0.94)                                                             | `.bolha-minha` — `bolha-minha 240ms var(--curva) both`                                                                                                 |
+| `bolha-dela`           | `from` opacity: 0; transform: scale(0.9)                                                                               | `.bolha-dela` — `bolha-dela 260ms var(--curva) both`                                                                                                   |
+
+**Gestos de ícone**
+
+| `@keyframes`    | Quadros                                                                                                                                                    | Quem usa, e com que atalho                                                                                                                                                                                                                                               |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tampa-lixeira` | `30%` transform: rotate(-12deg) translateY(-1px) → `60%` transform: rotate(6deg) → `100%` transform: none                                                  | `[data-icone="lixeira"]:hover svg, [aria-label^="Apagar" i]:hover > svg:only-child, [aria-label^="Excluir" i]:hover > svg:only-child, [aria-label^="Remover" i]:hover > svg:only-child, [title^="Apagar" i]:hover > svg:only-child` — `tampa-lixeira 420ms var(--curva)` |
+| `pulso-icone`   | `40%` transform: scale(1.22) → `70%` transform: scale(0.96) → `100%` transform: scale(1)                                                                   | `[aria-label^="Gravar" i]:hover > svg:only-child, [aria-label^="Ditar" i]:hover > svg:only-child, [aria-label^="Ouvir" i]:hover > svg:only-child, [aria-label^="Narrar" i]:hover > svg:only-child` — `pulso-icone 520ms var(--curva)`                                    |
+| `rabiscar`      | `25%` transform: translate(1.5px, -1.5px) rotate(-8deg) → `55%` transform: translate(-1px, 1px) rotate(6deg) → `100%` transform: none                      | `[aria-label^="Editar" i]:hover > svg:only-child, [aria-label^="Renomear" i]:hover > svg:only-child` — `rabiscar 460ms var(--curva)`                                                                                                                                     |
+| `balancar-sino` | `15%` transform: rotate(-14deg) → `35%` transform: rotate(11deg) → `55%` transform: rotate(-7deg) → `75%` transform: rotate(4deg) → `100%` transform: none | `[data-icone="sino"]:hover svg, [aria-label*="lembrete" i]:hover > svg:only-child, [aria-label*="notifica" i]:hover > svg:only-child` — `balancar-sino 620ms var(--curva)`                                                                                               |
+| `trancar`       | `0%` transform: rotate(-12deg) scale(1.12) → `55%` transform: rotate(6deg) scale(0.94) → `100%` transform: rotate(0deg) scale(1)                           | `.animar-trancar` — `trancar 0.32s cubic-bezier(0.16, 1, 0.3, 1) both`                                                                                                                                                                                                   |
+| `destrancar`    | `0%` transform: rotate(0deg) scale(1) → `45%` transform: rotate(-14deg) scale(1.14) → `100%` transform: rotate(0deg) scale(1)                              | `.animar-destrancar` — `destrancar 0.32s cubic-bezier(0.16, 1, 0.3, 1) both`                                                                                                                                                                                             |
+
+**Dirigidas por rolagem ou View Transition**
+
+| `@keyframes`         | Quadros                                                                                                                                                         | Quem usa, e com que atalho                                                     |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `encolher-cabecalho` | `to` transform: scale(0.72); opacity: 0.55                                                                                                                      | `.cabecalho-encolhe` — `encolher-cabecalho linear both`                        |
+| `onda-tema`          | `from` clip-path: circle(0% at var(--onda-x, 50%) var(--onda-y, 50%)) → `to` clip-path: circle(var(--onda-raio, 150%) at var(--onda-x, 50%) var(--onda-y, 50%)) | `html[data-onda] ::view-transition-new(root)` — `onda-tema 520ms var(--curva)` |
+
+**Estado vazio**
+
+| `@keyframes`     | Quadros                                                   | Quem usa, e com que atalho |
+| ---------------- | --------------------------------------------------------- | -------------------------- |
+| `vazio-entrando` | `from` opacity: 0; transform: translateY(10px) scale(0.9) | chamado inline / por JS    |
+| `vazio-boiando`  | `50%` transform: translateY(-2px) scale(1.05)             | chamado inline / por JS    |
+
+---
+
+---
+
 ## 7. Interação
 
 ### 7.1 O piso
@@ -944,19 +1102,30 @@ que não davam sinal nenhum de que eram.
 
 ```css
 @media (prefers-reduced-motion: no-preference) {
-  :is(button, [role="button"], summary, label[for], a[href], .pressionavel, .interativo):not(
-    :disabled,
-    [aria-disabled="true"]
-  ) {
+  :is(
+    button,
+    [role="button"],
+    summary,
+    label[for],
+    a[href],
+    .pressionavel,
+    .interativo
+  ):not(:disabled, [aria-disabled="true"]) {
     transition-property:
-      transform, opacity, background-color, background-image, color, border-color, box-shadow;
+      transform, opacity, background-color, background-image, color,
+      border-color, box-shadow;
   }
 
   @media (hover: hover) {
-    :is(button, [role="button"], summary, label[for], a[href], .pressionavel, .interativo):not(
-        :disabled,
-        [aria-disabled="true"]
-      ):hover {
+    :is(
+        button,
+        [role="button"],
+        summary,
+        label[for],
+        a[href],
+        .pressionavel,
+        .interativo
+      ):not(:disabled, [aria-disabled="true"]):hover {
       background-image: linear-gradient(var(--veu-hover), var(--veu-hover));
     }
   }
@@ -1081,6 +1250,81 @@ no clique. Além disso, alguns **gestos nomeados** por `aria-label` ou
 
 As rotações são pequenas de propósito: 10–12°, não 20. Passou disso vira
 desenho animado.
+
+**Como isso é escrito — e por que não é um `prop` de componente.** O gesto sai
+do que o botão **diz**, não de uma propriedade que alguém tem de lembrar de
+passar. Duas portas de entrada:
+
+```css
+/* 1. O piso: qualquer svg sozinho dentro de um clicável. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :is(button, [role="button"], a[href]):not(:disabled) > svg:only-child {
+    transition: transform var(--tempo-rapido) var(--curva);
+  }
+  :is(button, [role="button"], a[href]):not(:disabled):hover > svg:only-child {
+    transform: scale(1.12);
+  }
+}
+:is(button, [role="button"], a[href]):not(:disabled):active > svg:only-child {
+  transform: scale(0.9);
+}
+
+/* 2. O gesto nomeado: pelo rótulo acessível, sem tocar no componente. */
+[aria-label^="Apagar" i]:hover > svg:only-child,
+[aria-label^="Excluir" i]:hover > svg:only-child,
+[aria-label^="Remover" i]:hover > svg:only-child,
+[title^="Apagar" i]:hover > svg:only-child,
+[data-icone="lixeira"]:hover svg {
+  animation: tampa-lixeira 420ms var(--curva);
+}
+```
+
+O `i` do seletor de atributo é o que faz "Apagar" e "apagar" valerem igual, e
+`^=` (começa com) evita casar com uma frase que só menciona a palavra. Quando o
+rótulo não serve — ícone dentro de um botão com texto, ou um verbo que não cabe
+no padrão —, a saída é `data-icone="lixeira"`, que é explícito.
+
+`> svg:only-child` é a parte que impede o efeito colateral: um botão com ícone
+**e** texto tem dois filhos, então o ícone não cresce sozinho e desalinha a
+linha.
+
+O mapa completo de rótulo → gesto:
+
+| `aria-label` / `data-icone` começa com                 | `@keyframes`    | Duração |
+| ------------------------------------------------------ | --------------- | ------- |
+| `Apagar`, `Excluir`, `Remover`, `data-icone="lixeira"` | `tampa-lixeira` | 420ms   |
+| contém `lembrete`, `notifica`, `data-icone="sino"`     | `balancar-sino` | 620ms   |
+| `Gravar`, `Ditar`, `Ouvir`, `Narrar`                   | `pulso-icone`   | 520ms   |
+| `Editar`, `Renomear`                                   | `rabiscar`      | 460ms   |
+
+E os que são só `transform` no hover, sem `@keyframes` (mais barato, e basta):
+nova/criar `rotate(12deg) scale(1.06)`; voltar `translateX(-2px)`; avançar
+`translateX(2px)`; restaurar `rotate(-10deg) scale(1.06)`; desfazer
+`rotate(10deg) scale(1.06)`; buscar `scale(1.1) rotate(-6deg)`; fechar
+`rotate(12deg)`; enviar/exportar `translate(2px, -2px) scale(1.06)`; favoritar
+`rotate(10deg) scale(1.1)`.
+
+**Miniatura e imagem** têm o seu próprio gesto, e ele é mais lento porque a área
+é maior:
+
+```css
+.zoom-suave {
+  overflow: hidden;
+}
+.zoom-suave img,
+.zoom-suave .zoom-alvo {
+  transition: transform var(--tempo-normal) var(--curva);
+}
+@media (hover: hover) {
+  .zoom-suave:hover img,
+  .zoom-suave:hover .zoom-alvo {
+    transform: scale(1.045);
+  }
+}
+```
+
+O `overflow: hidden` fica no invólucro: só a imagem cresce, a moldura não. É o
+gesto de galeria — nada em volta se mexe.
 
 **Deduza o gesto do rótulo, não do call site.** O componente de botão-só-ícone
 já exige um rótulo acessível; ele é a única coisa que descreve a ação, então é
@@ -1294,6 +1538,28 @@ para agrupar, não para gritar. Quem dá a cor é a letra e o ícone.
 `ChipBotao` acrescenta `.pressionavel` e `aria-pressed`. Ativo com cor: fundo
 sólido na cor e letra em `--sobre-emocao`.
 
+**E o "badge"? Não existe.** É o mesmo `<Chip>`, e essa é a decisão — não a
+falta de uma. Etiqueta, filtro, categoria, estado, contador e selo de plano
+foram, em algum momento, seis componentes com seis alturas; hoje são um só, com
+a variante escolhendo o papel:
+
+| Papel                         | Variante                                |
+| ----------------------------- | --------------------------------------- |
+| Etiqueta / tag                | `neutro`, ou `cor` quando tem categoria |
+| Filtro (clicável)             | `ChipBotao` + `ativo`                   |
+| Estado positivo / em vigor    | `acento`                                |
+| Estado neutro / informativo   | `contorno`                              |
+| Destaque forte (uma por tela) | `solido`                                |
+
+Três limites, todos aprendidos errando:
+
+- **Selo não carrega número sozinho.** "3" numa pílula não diz três de quê.
+  Use `3 fotos`, ou ponha o número na linha de metadado.
+- **No máximo um selo por linha de lista.** Dois viram uma coluna de pílulas
+  concorrendo com o dado à direita (§8.14).
+- **Selo não tem ícone E texto quando mede menos de 80px.** Aos 11px com
+  `gap-1.5`, o ícone come metade da pílula. Ou ícone, ou palavra.
+
 **Filtro não herda a cor de categoria.** A cor de categoria diz a natureza de um
 **item**; num filtro ela vira a cor do botão, e uma fileira com dois coloridos e
 dois neutros ("receitas" verde, "despesas" vermelho, ao lado de "tudo" e
@@ -1323,6 +1589,39 @@ aparece nos itens que a escolha revela.
 | Rodapé           | `border-t px-5 py-4`                                            |
 | Alça (só mobile) | `h-1 w-10 rounded-full bg-[var(--borda-forte)]`                 |
 | Saída            | fica montada 160ms depois de fechar, para a animação rodar      |
+
+**Medidas exatas**, para não sobrar dúvida ao reconstruir:
+
+```
+invólucro: fixed inset-0 flex items-end justify-center sm:items-center   (z-[80])
+véu:       absolute inset-0 bg-black/40 backdrop-blur-[2px]
+caixa:     relative z-10 flex w-full flex-col max-w-md max-h-[85dvh] pb-segura
+           rounded-t-[var(--raio-cartao)] sm:rounded-[var(--raio-cartao)]
+           border bg-[var(--superficie)] shadow-[var(--sombra-alta)] outline-none
+alça:      mx-auto mt-2.5 mb-0.5 h-1 w-10 rounded-[var(--raio-pilula)]
+           bg-[var(--borda-forte)] sm:hidden
+cabeçalho: flex items-start justify-between gap-3 border-b px-5 py-4
+           título  → h2.display.txt-lg
+           descrição → p.t3.txt-sm.mt-1 leading-relaxed
+corpo:     flex-1 min-h-0 overflow-y-auto px-5 py-4   (esconder-barra)
+rodapé:    border-t px-5 py-4
+```
+
+A largura é `prop` (`largura="max-w-md"`), e três valores dão conta de tudo:
+`max-w-sm` para confirmar, `max-w-md` (o padrão) para um formulário curto,
+`max-w-lg` para lista. Acima disso o modal deixa de ser modal — é tela.
+
+**O botão de fechar tem DOIS lugares, e isso não é indecisão.** Com cabeçalho,
+ele é o último filho da linha do título (`-mr-1 -mt-1 shrink-0 p-1.5`) — alinhado
+pelo topo com o título, com a margem negativa cancelando o próprio padding para
+que o ícone, e não a área de clique, bata com a borda de 20px. **Sem** cabeçalho
+(uma folha que é só uma foto, um seletor), ele flutua: `absolute right-3 top-10
+sm:top-3` — o `top-10` no celular o desce abaixo da alça, que ocupa o alto; a
+partir de `sm` não há alça e ele sobe.
+
+O ícone é `X` de 16px em `--texto-3`, com hover para `--superficie-2` e
+`--texto`, raio `--raio-p`. Nunca fora da caixa, nunca no rodapé: o canto
+superior direito é onde a mão procura.
 
 Resolve num lugar só o que cada diálogo resolvia (ou esquecia) por conta
 própria: `role="dialog"`, `aria-modal`, Esc, travar a rolagem do fundo, prender
@@ -1405,7 +1704,9 @@ Use `<details>/<summary>` para pergunta-e-resposta: ele já traz teclado,
 `aria-expanded` e busca-na-página de graça. Duas linhas o colocam no sistema:
 
 ```css
-summary::-webkit-details-marker { display: none; }  /* o triângulo do navegador */
+summary::-webkit-details-marker {
+  display: none;
+} /* o triângulo do navegador */
 ```
 
 …e o indicador vira um ícone de 16px que gira 180° com `group-open:rotate-180`.
@@ -1520,14 +1821,14 @@ falta pagar). É o cartão mais copiado de um app de dados, e o que mais diverge
 </FileiraDeValores>
 ```
 
-| Peça      | Regra                                                                      |
-| --------- | -------------------------------------------------------------------------- |
+| Peça      | Regra                                                                                                                                                     |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Estrutura | sobrancelha em cima, número embaixo, `justify-between` — os números de vários cartões ficam na mesma altura mesmo com sobrancelhas de tamanhos diferentes |
-| Número    | `.numeral` no degrau de número, **sempre o mesmo** em todos os cartões da tela |
-| Ícone     | opcional, 32px, redondo, fundo tingido na cor da categoria a `--chip-tinta` |
-| Rodapé    | contexto em `.txt-xs`, na cor de metadado                                  |
-| Grade     | **uma coluna no celular**, duas a partir de `sm`, o resto no desktop        |
-| Destaque  | uma variante de acento, e **uma só por tela** — duas competem               |
+| Número    | `.numeral` no degrau de número, **sempre o mesmo** em todos os cartões da tela                                                                            |
+| Ícone     | opcional, 32px, redondo, fundo tingido na cor da categoria a `--chip-tinta`                                                                               |
+| Rodapé    | contexto em `.txt-xs`, na cor de metadado                                                                                                                 |
+| Grade     | **uma coluna no celular**, duas a partir de `sm`, o resto no desktop                                                                                      |
+| Destaque  | uma variante de acento, e **uma só por tela** — duas competem                                                                                             |
 
 Sobrancelha curta (§4.2): "receitas", não "receitas do mês" — o mês já está no
 cabeçalho da tela, e uma sobrancelha de duas linhas empurra o número para baixo
@@ -1570,6 +1871,24 @@ tocadas enquanto a tela de destino montava.
 `trocaDeRota` existe porque voltar nem sempre navega: às vezes fecha um painel
 ou volta uma etapa dentro da mesma tela. Acender o indicador nesses casos o
 deixa pendurado esperando uma navegação que não vem.
+
+```
+t2 foco-anel -ml-2 flex items-center gap-1.5 rounded-[var(--raio-pilula)]
+px-2 py-1.5 txt-sm font-medium transition hover:text-[var(--texto)]
+└ ArrowLeft h-4 w-4 + a palavra "Voltar"
+```
+
+Três medidas que fazem a diferença entre "certo" e "quase":
+
+- **`-ml-2` é obrigatório.** O botão tem `px-2` para ter alvo de toque; sem a
+  margem negativa que o cancela, a seta fica dois pixels adentro e o cabeçalho
+  parece desalinhado com o título logo abaixo, que começa na borda da `.pagina`.
+- **É seta + palavra, não seta sozinha.** Um ícone solto no canto vira um alvo
+  de 16px que ninguém acerta com o polegar; o rótulo dobra a área e diz para
+  onde se volta.
+- **Ele fica na primeira linha da tela**, dentro de um `<header className="mb-8
+flex items-center justify-between">` — voltar à esquerda, as ações da tela à
+  direita. Ver §10.2.
 
 ### 8.16 Só com internet / só com o recurso
 
@@ -1636,12 +1955,12 @@ return createPortal(<div className="fixed …">{children}</div>, document.body);
 
 No `body` não há ancestral que a capture. E, já que ela é um componente:
 
-| Peça               | Valor                                                                     |
-| ------------------ | ------------------------------------------------------------------------- |
-| Camada             | `--z-avisos` — acima do conteúdo, abaixo de folha e visor                 |
-| Celular            | `inset-x-4`, `bottom: calc(var(--altura-nav) + safe-area + 0.5rem)`       |
-| Desktop            | canto inferior direito, com respiro para não colidir com a bolha do chat  |
-| Entrada            | `.animar-surgir`                                                          |
+| Peça    | Valor                                                                    |
+| ------- | ------------------------------------------------------------------------ |
+| Camada  | `--z-avisos` — acima do conteúdo, abaixo de folha e visor                |
+| Celular | `inset-x-4`, `bottom: calc(var(--altura-nav) + safe-area + 0.5rem)`      |
+| Desktop | canto inferior direito, com respiro para não colidir com a bolha do chat |
+| Entrada | `.animar-surgir`                                                         |
 
 **Vale para tudo que é `fixed` dentro de uma tela animada**: menu que brota de
 um botão, tooltip posicionado à mão, folha escrita sem o componente. Se algo
@@ -1667,6 +1986,47 @@ Mostre-o na janela em que ele é útil (aqui: os últimos 15 dias).
 
 ---
 
+### 8.20 Avatar: a inicial antes da foto
+
+Foto de pessoa quase nunca está pronta no primeiro quadro — ela mora num bucket
+privado, precisa de URL assinada e ainda tem de ser baixada. O reflexo comum é
+mostrar um **ícone genérico** de silhueta enquanto isso. Não faça: com trinta
+pessoas na tela são trinta bonecos iguais virando trinta rostos em ordem
+aleatória, e a lista parece se montar sozinha, aos pedaços.
+
+Mostre a **inicial do nome** sobre um fundo tingido:
+
+```tsx
+<span className="superficie-2 relative … rounded-[var(--raio-pilula)]"
+      style={{ background: fundoDoAvatar(nome) }}>
+  <span aria-hidden className="t2 font-semibold [font-size:45%] leading-none">{inicial}</span>
+  {url && <img … className={`absolute inset-0 … transition-opacity
+                             ${carregada ? "opacity-100" : "opacity-0"}`} />}
+</span>
+```
+
+Quatro decisões, e todas importam:
+
+1. **A inicial já é a pessoa certa.** A lista nasce completa; a foto acrescenta
+   o rosto, não o item. A chegada fora de ordem deixa de existir como problema
+   porque nada estava faltando.
+2. **A cor sai do nome**, por um hash estável — a mesma pessoa tem sempre a
+   mesma cor —, e os tons são os da **cor de categoria** (§3.4), na tinta dos
+   chips. Nenhuma paleta nova: eles já foram escolhidos para conviver com o
+   acento nos quatro temas.
+3. **A foto entra POR CIMA**, com `opacity` em `--tempo-normal` disparada pelo
+   `onLoad`. Trocar um elemento pelo outro cria o quadro vazio que se quis
+   evitar; sobrepor, não.
+4. **A letra é uma fração do avatar** (`45%`), não um degrau da escala
+   tipográfica. O mesmo componente vai de 24 a 96 pixels, e ali a letra não é
+   texto de leitura: é o desenho de uma forma.
+
+Sem nenhuma letra no nome (alguém salvo só com emoji), aí sim volta o ícone.
+
+---
+
+---
+
 ## 9. Moldura e navegação
 
 ### 9.1 A casca
@@ -1688,6 +2048,40 @@ Mostre-o na janela em que ele é útil (aqui: os últimos 15 dias).
   </body>
 </html>
 ```
+
+### 9.1b A barra do sistema
+
+No celular, a faixa de status fica encostada no app — e se ela não for
+**exatamente** a cor do fundo da página, o app parece começar um fio abaixo do
+alto da tela. Três regras, e as três nasceram de erro:
+
+1. **Uma meta só, sua, sem `media`.** Duas metas com `media="(prefers-color-scheme)"`
+   respondem ao SISTEMA: quem escolhe escuro dentro de um app claro fica com a
+   barra de uma cor e a tela de outra. E se quem declara a meta é o framework
+   (`viewport.themeColor` no Next), ele a reescreve a cada navegação — a barra
+   voltava ao claro a cada troca de tela. Crie a meta você, marcada
+   (`data-tema-app`), no script que roda antes da primeira pintura.
+
+2. **O valor é o `--fundo` computado, não um hexadecimal repetido.**
+
+   ```js
+   var fundo = getComputedStyle(raiz).getPropertyValue("--fundo").trim();
+   meta.setAttribute("content", fundo || reserva);
+   ```
+
+   Repetir o hex é criar uma segunda fonte da verdade que vai divergir na
+   primeira vez que alguém acertar o tom do tema. Se você mantiver uma reserva
+   (para o instante em que a folha ainda não valeu), **trave-a com um teste**
+   que lê o CSS e compara.
+
+3. **O modificador de contraste entra ANTES da barra ser pintada.** Ele troca o
+   `--fundo`; pintar antes dá o tom do tema normal com a página no alto
+   contraste. É o erro mais difícil de ver e o mais fácil de cometer.
+
+E no manifesto do PWA, **nada de `theme_color`**: num app instalado ele ganha da
+meta e é lido uma vez, na instalação — a barra fica presa naquela cor para
+sempre, inclusive com o app no tema escuro. `background_color` pode ficar: é só
+a tela de abertura.
 
 ### 9.2 A página
 
@@ -1756,6 +2150,41 @@ font-medium`; ativo em `--texto`, inativo em `.t2`. Ícone de 18px,
   canto (agente, ajuda) — a primária vira um botão flutuante empilhado com ela,
   e a coluna fica só com navegação. Escolha um dos dois e não repita.
 - Versão do app no rodapé, em `.t3 .txt-xs`.
+
+**A marca, medida.** Ela é um componente com um só número de entrada — o lado do
+símbolo — e todo o resto sai dele por proporção. É o que faz a marca de 30px do
+trilho, a de 32px do cabeçalho do celular e a de 56px da tela de entrar serem a
+**mesma** marca:
+
+```tsx
+<Logo tamanho={30} />          // símbolo + palavra
+<Simbolo tamanho={16} />       // só o símbolo (favicon, item de lista)
+```
+
+```
+invólucro: inline-flex items-center gap-2.5
+símbolo:   svg quadrado de `tamanho`, viewBox 0 0 32 32,
+           rect de fundo com rx=9 (28% do lado) na cor de acento sólida
+palavra:   .display, font-size = tamanho × 0.72, letter-spacing -0.045em,
+           em caixa baixa, na cor de texto padrão — NUNCA no acento
+```
+
+| Onde                      | `tamanho` | Posição                                   |
+| ------------------------- | --------- | ----------------------------------------- |
+| Trilho do desktop         | 30px      | topo da coluna, `px-4 py-6`, `mb-8`       |
+| Cabeçalho do celular      | 30px      | à esquerda, `mb-6`, some a partir de `lg` |
+| Tela de entrar / abertura | 56px      | centralizada, acima do título             |
+| Ícone de app / favicon    | 16–32px   | só o símbolo, sem palavra                 |
+
+Três regras: a palavra **nunca** vem no acento (o símbolo já é a cor da marca, e
+duas coisas coloridas lado a lado brigam); o `gap` é `2.5` (10px) em qualquer
+tamanho — proporcional ficaria frouxo nos tamanhos grandes; e a marca **não é
+link para lugar nenhum no desktop**, porque o item "início" do trilho está logo
+abaixo dela e dois caminhos para a mesma tela é um deles a mais.
+
+O símbolo desenhado precisa funcionar a 16px. Aqui são três barras num quadrado
+arredondado — de perto, linhas de texto; de longe, uma onda de voz. Se o seu
+desenho perde a leitura no favicon, ele ainda não está pronto.
 
 **O `sticky` da coluna morre com `overflow: hidden` no pai.** Um contêiner com
 `overflow-x: hidden` (posto ali para segurar um estouro horizontal) vira um
@@ -1941,7 +2370,54 @@ lista                            [--i:3]
 - **Carregando**: esqueletos com as alturas variadas do conteúdo real, nunca um
   bloco só.
 
-### 10.2 Detalhe com abas
+### 10.2 Detalhe
+
+A tela de detalhe é a segunda mais visitada de qualquer app, e a que mais varia
+quando cada uma é escrita à mão. Ela tem uma anatomia, e é esta — de cima para
+baixo, tudo dentro da `.pagina` (§9.2), que já dá as margens laterais:
+
+```
+<div class="pagina">
+  <header class="mb-8 flex items-center justify-between">
+    <BotaoVoltar />                                  ← à esquerda, -ml-2
+    <div class="flex items-center gap-1.5">…</div>   ← ações da tela, à direita
+  </header>
+
+  <div class="cabecalho-encolhe animar-surgir mb-8" data-encadeado --i:0>
+    <p class="rotulo mb-3 flex flex-wrap gap-x-2.5 gap-y-1.5">…</p>  ← metadados, separados por ·
+    <h1 class="display txt-display-2 max-w-3xl">título</h1>
+  </div>
+
+  <secao data-encadeado --i:1>  …  </secao>
+  <secao data-encadeado --i:2>  …  </secao>
+</div>
+```
+
+| Peça                    | Medida                                                     |
+| ----------------------- | ---------------------------------------------------------- |
+| Barra de ações → título | `mb-8` (32px)                                              |
+| Título → primeira seção | `mb-8` (32px)                                              |
+| Entre seções            | `mb-6` (24px)                                              |
+| Metadado → título       | `mb-3` (12px)                                              |
+| Ações no canto direito  | `gap-1.5`, alvos de 36px (`h-9`)                           |
+| Largura do título       | `max-w-3xl` — um título longo não atravessa a tela inteira |
+
+Quatro decisões que valem para toda tela de detalhe:
+
+1. **O título é `.txt-display-2`, não `.txt-display`.** O degrau maior é da tela
+   de listagem, onde o título é o nome da seção do app; aqui ele é o nome de
+   **um item**, e usar o mesmo degrau faz o item competir com o app.
+2. **Os metadados vêm ANTES do título, na sobrancelha**, separados por `·` e com
+   `flex-wrap`: emoção, dia da semana, data, lugar. Embaixo do título eles
+   empurram o conteúdo; em cima, apresentam.
+3. **O cabeçalho encolhe ao rolar** (`.cabecalho-encolhe`, §6.3) num intervalo de
+   `0 180px` — mais curto que o da listagem (220px), porque aqui o que interessa
+   é o corpo, e ele começa mais cedo.
+4. **A tela inteira é encadeada** (`data-encadeado` com `--i` crescente): barra,
+   cabeçalho, seções. É o que faz a tela se montar de cima para baixo em vez de
+   aparecer de uma vez.
+
+**Com abas**, entram duas peças no meio, e nada mais muda:
 
 ```
 cabeçalho que encolhe ao rolar   [--i:0]
@@ -1949,6 +2425,9 @@ abas: Trilho instantaneo         [--i:1]
 TrocaPainel com o conteúdo       [--i:2]
 coluna lateral (lg+)
 ```
+
+O `Trilho` vai `instantaneo` quando há `TrocaPainel` (§8.6): dois movimentos
+contando a mesma troca competem entre si.
 
 ### 10.3 Formulário
 
