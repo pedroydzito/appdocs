@@ -241,6 +241,10 @@ cobra **uma ida à rede ao provedor de identidade em cada requisição**, inclus
 em cada payload de rota que o roteador busca ao navegar. É o custo fixo mais
 caro do vaivém entre telas, e ele não aparece em nenhum perfil de JavaScript.
 
+Na **abertura a frio** é pior, e é lá que se percebe: a instância também está
+fria, então é um TLS novo inteiro na frente do primeiro byte do HTML — nada da
+página começa antes disso. Ver §8.4.
+
 A correção é ler o vencimento do token **do próprio cookie** e só ir à rede
 quando falta pouco (uma margem de ~120 s):
 
@@ -679,12 +683,13 @@ Três camadas, e cada uma resolve uma coisa:
 
 ### 8.1 Service worker — a casca
 
-| Recurso            | Estratégia                                  |
-| ------------------ | ------------------------------------------- |
-| Navegação          | rede primeiro, cache como rede de segurança |
-| Estáticos com hash | cache primeiro (o hash já é a versão)       |
-| Imagens do usuário | cache e revalida em paralelo                |
-| API                | **sempre rede**, nunca cache                |
+| Recurso                            | Estratégia                                               |
+| ---------------------------------- | -------------------------------------------------------- |
+| Navegação                          | **cache guardado na hora**, revalidando atrás (ver §8.4) |
+| Navegação sem cópia deste endereço | rede com prazo, cache como rede de segurança             |
+| Estáticos com hash                 | cache primeiro (o hash já é a versão)                    |
+| Imagens do usuário                 | cache e revalida em paralelo                             |
+| API                                | **sempre rede**, nunca cache                             |
 
 Detalhes que evitam dor:
 
@@ -705,10 +710,21 @@ Detalhes que evitam dor:
   promessa de rede continua correndo e, ao falhar, vira `unhandled rejection`
   dentro do service worker. Marque-a como tratada (`daRede.catch(() => {})`)
   logo depois de criá-la.
+- **Nunca guarde uma resposta `redirected`.** Sem sessão, o servidor desvia para
+  a tela de entrar; o `fetch` da navegação SEGUE o desvio, e o que chega no
+  worker é um 200 com o HTML do login e `resposta.ok` verdadeiro. Guardar isso
+  sob a chave da rota pedida faz o app abrir na tela de entrar **mesmo depois de
+  entrar**, e ninguém liga uma coisa na outra. A condição é
+  `resposta.ok && !resposta.redirected`, e ela vale para toda gravação de HTML.
 - **Pré-carregue** as rotas principais e uma página de "sem conexão".
 - Sirva o próprio arquivo do service worker com `Cache-Control: no-store`.
-- **Registre só em produção**, depois do `load`. Em desenvolvimento ele só
-  atrapalha.
+- **Registre só em produção, e no primeiro OCIOSO — não no `load`.** Instalar o
+  worker dispara o pré-cache inteiro: quinze rotas mais os chunks de cada uma.
+  Em `load`, essas dezenas de requisições começam enquanto o app ainda hidrata e
+  faz a primeira sincronização, competindo com exatamente o que a pessoa está
+  esperando ver — e para servir à PRÓXIMA abertura, não a esta.
+  `requestIdleCallback` com `timeout` de 3s (o teto para quem nunca fica
+  ocioso). Em desenvolvimento ele só atrapalha.
 
 ### 8.2 Banco local — o que ainda não subiu
 
@@ -724,6 +740,129 @@ que ainda não subiu.
 
 Tente esvaziar na montagem e no evento `online`. Mostre o indicador de
 sincronização **apenas quando houver pendências**.
+
+### 8.4 A abertura: o app instalado que demora cinco segundos com a logo na tela
+
+Esta é a espera que quase nenhum guia de desempenho cobre, porque ela não
+aparece em perfil de JavaScript nenhum e some dentro de um número que ninguém
+mede: o tempo entre tocar no ícone e a tela existir.
+
+O sintoma tem duas caras, e é o **mesmo** problema visto de dois lugares:
+
+- no navegador, digitar o endereço e ficar ~3 s com a barra girando antes de
+  qualquer coisa aparecer;
+- no app instalado, ~5 s com a tela de abertura do sistema (a logo sobre a cor
+  de fundo) antes do app.
+
+A segunda é a mais reveladora. **A tela de abertura do sistema fica no ar até o
+primeiro quadro da página.** Ela não é uma animação com duração própria; ela é a
+medida exata do que o app faz antes de pintar. Cinco segundos de logo são cinco
+segundos de espera de verdade.
+
+**A causa quase sempre é a mesma, e é contraintuitiva: o app tinha tudo o que
+precisava, guardado, e foi perguntar ao servidor se havia algo melhor.**
+
+Três esperas se somam, nesta ordem de tamanho.
+
+**1. A navegação do service worker era "rede primeiro".**
+
+É a estratégia que todo guia recomenda, e por um bom motivo: ninguém quer ficar
+preso a um HTML de duas versões atrás. Costuma vir com um prazo — 3 s, 3,5 s —
+para não ficar tela branca num 4G ruim.
+
+No navegador esse prazo quase não aparece, porque a rede geralmente responde
+antes. No app instalado ele aparece **inteiro**, porque é a abertura a frio: o
+worker acorda, o aparelho negocia a rede, e a logo fica lá. O HTML estava a um
+centímetro de distância.
+
+A correção é servir o guardado **na hora**, e revalidar atrás:
+
+```js
+const daRede = (async () => {
+  const resposta = await fetch(request);
+  if (resposta.ok && !resposta.redirected) {
+    await cache.put(chave, resposta.clone());
+    void aquecerEstaticos(resposta); // o HTML novo sem os chunks novos é tela branca
+  }
+  return resposta;
+})();
+daRede.catch(() => {}); // a rejeição não pode ficar solta
+
+// O caminho rápido: esta rota já está guardada.
+const desteEndereco = await cache.match(chave);
+if (desteEndereco) return desteEndereco;
+
+// Sem cópia DESTE endereço, segue o caminho antigo: rede com prazo,
+// e o que houver guardado como rede de segurança.
+```
+
+Duas decisões dentro disso, e as duas importam:
+
+- **Só a cópia EXATA do endereço vale para o caminho rápido.** A casca de outra
+  rota também abriria o app — o HTML de um roteador de cliente é o mesmo casco,
+  e o roteador lê o endereço e monta a tela certa. Mas isso custa uma remontagem
+  no cliente e um piscar da tela errada. É um ótimo negócio contra "sem
+  internet"; é um péssimo negócio contra "meio segundo".
+- **A versão nova entra na abertura seguinte.** Isso soa pior do que é: o app já
+  tinha esse contrato para o próprio service worker (instala, avisa, a pessoa
+  recarrega). Servir HTML de uma versão atrás por uma abertura é o mesmo
+  compromisso, e a alternativa é cobrar a espera de todo mundo, toda vez, para
+  cobrir o dia do deploy.
+
+**2. A portaria ia à rede antes do primeiro byte do HTML.**
+
+O middleware validando a sessão a cada requisição — §4.6. Na navegação entre
+telas isso é caro; na abertura a frio é pior, porque a instância também está
+fria: é um TLS novo inteiro na frente de tudo, e nada da página começa antes.
+Ler o vencimento do próprio cookie e só ir à rede quando falta pouco tira essa
+ida do caminho crítico.
+
+**3. O pré-cache começava enquanto o app ainda hidratava.**
+
+Registrar o worker em `load` dispara a instalação — e a instalação baixa as
+rotas essenciais e os chunks de cada uma. São dezenas de requisições disputando
+banda e CPU com a hidratação e com a primeira sincronização, **para servir à
+próxima abertura**. Nada ali é urgente. Vai para o primeiro ocioso.
+
+**E o que sobra na frente: as fontes.** `preload` de fonte é prioridade alta,
+antes do JavaScript que desenha a tela. Vale para a fonte que está no primeiro
+quadro de toda tela (a de interface, a de título). Não vale para a que só
+aparece dentro de um item aberto: ali ela é um par de arquivos competindo com os
+chunks para desenhar um texto que ainda não está na tela. Com `display: swap`
+nada pisca por tirá-la do `preload` — o texto nasce na fonte de reserva e troca
+quando a dela chega, que é exatamente a hora certa.
+
+**A guarda que torna tudo isso seguro.** Servir a casca guardada e restaurar do
+bfcache (§7.7) têm o mesmo efeito colateral: a tela aparece sem a portaria ter
+decidido nada. Quem perdeu a sessão no meio-tempo — saiu da conta noutra aba,
+num computador emprestado — voltaria a ver o app. Então o cliente confere:
+
+```tsx
+// Em rota que exige conta, e SÓ com rede.
+if (navigator.onLine === false) return; // offline não dá para concluir nada
+const { data } = await cliente.auth.getSession();
+if (!data.session) window.location.replace(`/entrar?proxima=${caminho}`);
+```
+
+Dois detalhes que custam caro se forem esquecidos:
+
+- **Vá direto para a tela de entrar, não para o mesmo endereço.** Recarregar o
+  caminho atual pareceria mais limpo — a portaria decidiria de novo — mas o
+  service worker devolveria a mesma casca guardada, a guarda rodaria outra vez, e
+  o app entra num **laço de recarregamentos**. A tela de entrar é pública: a
+  guarda não roda lá.
+- **Offline, a guarda não expulsa ninguém.** Sem rede, `getSession()` não
+  consegue renovar um token vencido e devolve `null` — e aí você estaria
+  fechando o diário na cara de quem abriu o app no avião justamente para ler o
+  que já está no aparelho. Sem internet a página fica; quem recusa é a próxima
+  chamada ao servidor.
+
+**Como medir.** Não use o perfil de JavaScript, que começa tarde demais. Use o
+`PerformanceNavigationTiming`: `responseStart − requestStart` é a portaria (2),
+`responseStart` perto de zero com o worker no controle é o caminho rápido
+funcionando (1), e `loadEventEnd` contra o começo do pré-cache mostra (3). No
+app instalado, o cronômetro honesto é o mais simples que existe: filme a tela e
+conte os quadros de logo.
 
 ---
 
@@ -1090,7 +1229,18 @@ Antes de dar uma tela por pronta:
       bfcache, e voltar para o app recarrega tudo.
 - [ ] Derivação cara de tela vive num memo de módulo, não num `useMemo` que
       morre na navegação.
-- [ ] Só as famílias e os pesos de fonte que a interface desenha de fato.
+- [ ] O service worker serve a casca guardada **na hora** na abertura, e
+      revalida atrás — não fica segundos com a logo na tela perguntando à rede
+      por um HTML que ele já tem.
+- [ ] Nenhuma resposta `redirected` vai para o cache de HTML (senão o app abre
+      na tela de entrar mesmo depois de entrar).
+- [ ] O service worker é registrado no primeiro OCIOSO, não em `load` — o
+      pré-cache não disputa banda com a hidratação.
+- [ ] Quando o HTML pode vir do cache ou do bfcache, existe uma guarda de sessão
+      no cliente — e ela não expulsa ninguém offline, nem recarrega o mesmo
+      endereço (laço).
+- [ ] Só as famílias e os pesos de fonte que a interface desenha de fato, e no
+      `preload` só as que estão no primeiro quadro.
 - [ ] Dois componentes dinâmicos que usam a mesma biblioteca pesada moram no
       mesmo módulo (senão são duas cópias).
 - [ ] Revalidação que devolve o mesmo resultado **não** repinta a tela.
@@ -1128,6 +1278,13 @@ Meça por rota (§2.1). Um único `import` no topo de um arquivo pode custar
 **3-b. Voltar para o app recarrega tudo?**
 Não é o sistema descartando a aba: é `no-store` no documento desligando o
 bfcache. → §7.7. Uma linha no middleware.
+
+**3-c. A ABERTURA demora, mas a navegação já está rápida?**
+São problemas diferentes e não se resolvem no mesmo lugar. Se o app instalado
+fica segundos na tela de abertura do sistema, quase sempre é o service worker
+indo perguntar à rede antes de servir o HTML que ele já tem guardado — mais a
+portaria e o pré-cache na frente da hidratação. → §8.4. A pista que separa este
+caso de todos os outros: o app é rápido **depois** que abre.
 
 **4. O primeiro toque de cada sessão demora?**
 Alguma checagem síncrona de servidor está no caminho do clique — permissão,
