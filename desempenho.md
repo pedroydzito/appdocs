@@ -371,6 +371,55 @@ fechados apareciam por meio segundo e sumiam.
 
 ---
 
+### 4.11 A lista pesada não bloqueia a casca
+
+Um layout que busca dados para toda a árvore acaba esperando pela **maior** das
+listas antes de mandar o primeiro byte — inclusive nas telas que não a leem. É o
+custo mais fácil de não enxergar: cada tela parece lenta por igual, porque todas
+pagam a mesma conta.
+
+O conserto não é buscar menos, é **não esperar**. O servidor entrega a promessa
+sem `await`; quem precisa do dado a lê com `use()` e suspende só o Suspense mais
+próximo. A casca, a navegação e o cabeçalho da tela pintam com o resto.
+
+**A regra que faz isso funcionar: o provedor não lê a promessa.**
+
+```tsx
+// ERRADO: use() aqui suspende a árvore inteira — a navegação volta a esperar.
+function Provedor({ promessa, children }) {
+  const lista = use(promessa);
+  return <Ctx.Provider value={lista}>{children}</Ctx.Provider>;
+}
+
+// CERTO: o provedor guarda a promessa; quem lê é que suspende.
+function Provedor({ promessa, children }) {
+  return <Ctx.Provider value={{ promessa }}>{children}</Ctx.Provider>;
+}
+export function useLista() {
+  return use(useContext(Ctx).promessa);
+}
+```
+
+Três coisas que vêm junto:
+
+- **Todo leitor precisa de um Suspense acima dele.** As rotas que já têm o
+  esqueleto de carregamento estão cobertas; as que não têm derrubam o fallback
+  para o do layout — que é a casca inteira, exatamente o que você estava
+  evitando. Ponha um Suspense de segurança em volta do conteúdo da rota.
+- **O que vive na navegação não pode ler a lista.** Uma busca global dentro da
+  barra lateral, lendo as transações, prende a barra na promessa. Separe: a
+  barra é a casca; o **painel** que abre no clique é quem lê, sob o Suspense
+  dele.
+- **O otimista continua funcionando** se a fila de patches for `useOptimistic`
+  sobre a **lista vazia**, aplicada em cima do que a promessa devolveu. O React
+  descarta a fila sozinho quando a transição termina, e você não precisa de uma
+  cópia local da lista para nada.
+
+Revalidar cria uma promessa nova, e uma promessa nova suspenderia de novo — mas
+isso acontece dentro de uma transição (a ação do servidor, o `refresh` do
+roteador), e transição não revela fallback: a tela anterior fica no lugar. Se
+você vir o esqueleto piscar a cada escrita, o que faltou foi a transição.
+
 ## 5. Listas longas
 
 ### 5.1 Virtualizar
