@@ -452,18 +452,16 @@ mesmo papel (1.75/2.25, 2.25/2.75, 2.5 fixo e 3.5/4.5). Quando um papel aparece
 duas vezes com números diferentes, o certo não é escolher um: é **dar nome aos
 dois degraus** e usar só eles.
 
-E um terceiro, que só aparece quando o cartão **divide a linha** com outro:
+**E um cartão de valor não divide a linha no celular.** O `.txt-numero` foi
+medido para um cartão de largura inteira; num mosaico de duas colunas num
+aparelho estreito, um valor com separador de milhar (`R$ 2.479,50`) **transborda
+a caixa** — o texto sai pela borda do cartão, que é o defeito mais fácil de
+deixar passar porque só aparece com dado real e comprido.
 
-| Classe                  | Tamanho                                    | Papel                                  |
-| ----------------------- | ------------------------------------------ | -------------------------------------- |
-| `.txt-numero-estreito`  | `.txt-xl` até `sm`, depois `.txt-numero`   | número em cartão que divide a linha    |
-
-O `.txt-numero` foi medido para um cartão de largura inteira. Num mosaico de
-duas colunas no celular, o cartão tem ~45% da tela, e um valor com separador de
-milhar (`R$ 2.479,50`) **transborda a caixa** — o texto sai pela borda do
-cartão, que é o defeito visual mais fácil de deixar passar porque só aparece
-com dado real e comprido. Não invente um tamanho no meio: componha os degraus
-que já existem, e mude no ponto de quebra.
+A saída **não** é um degrau menor para esses cartões: isso faz a mesma tela ter
+dois tamanhos de número dizendo a mesma coisa, e o olho lê como desalinho. A
+saída é a lista: **um cartão por linha no celular**, duas colunas a partir de
+`sm`. Ver §8.14.
 
 ### 4.2 Os três gestos tipográficos
 
@@ -599,6 +597,14 @@ descreve a realidade não é seguida — é contornada.
 **Botão e campo compartilham o raio.** Um campo de busca com moldura de cartão
 (1.25rem) fica visivelmente mais arredondado que o botão ao lado — foi
 exatamente esse o defeito que originou a classe `.campo-busca`.
+
+**A forma diz o papel, e a pílula é de rótulo — não de escolha.** Tudo que
+mostra ou recebe um **valor escolhido** usa o raio de campo: campo de busca,
+dropdown, aba, filtro, passo de mês, segmentado. A pílula fica para o que é
+**rótulo ou alvo**: chip, badge, botão só de ícone, a barra de navegação, a
+barra de progresso. Misturar os dois é o defeito que mais aparece em revisão —
+um filtro totalmente arredondado ao lado de um dropdown de raio de campo, na
+mesma linha, lendo como dois sistemas.
 
 ### 5.4 Elevação
 
@@ -1397,6 +1403,48 @@ O cartão tingido por categoria usa `::before` com um `radial-gradient` da cor e
 22%, que aparece no hover junto de uma borda em 45% da mesma cor — a cor entra
 como luz, não como preenchimento.
 
+**Cartão de valor** — o cartão que mostra UM número (saldo, total do mês, quanto
+falta pagar). É o cartão mais copiado de um app de dados, e o que mais diverge:
+
+```tsx
+<FileiraDeValores colunas={3}>
+  <CartaoValor variante="acento" rotulo="saldo total" valor={saldo} rodape={…} />
+  <CartaoValor rotulo="receitas" valor={receitas} tom="entrada" icone={Seta} />
+</FileiraDeValores>
+```
+
+| Peça      | Regra                                                                      |
+| --------- | -------------------------------------------------------------------------- |
+| Estrutura | sobrancelha em cima, número embaixo, `justify-between` — os números de vários cartões ficam na mesma altura mesmo com sobrancelhas de tamanhos diferentes |
+| Número    | `.numeral` no degrau de número, **sempre o mesmo** em todos os cartões da tela |
+| Ícone     | opcional, 32px, redondo, fundo tingido na cor da categoria a `--chip-tinta` |
+| Rodapé    | contexto em `.txt-xs`, na cor de metadado                                  |
+| Grade     | **uma coluna no celular**, duas a partir de `sm`, o resto no desktop        |
+| Destaque  | uma variante de acento, e **uma só por tela** — duas competem               |
+
+Sobrancelha curta (§4.2): "receitas", não "receitas do mês" — o mês já está no
+cabeçalho da tela, e uma sobrancelha de duas linhas empurra o número para baixo
+em um cartão e não no vizinho.
+
+**Linha de lista** — a outra metade do vocabulário, e a mais repetida:
+
+```
+[ladrilho 36px]  título (txt-sm font-medium, truncado)      valor (txt-sm font-semibold)
+                 metadado (txt-xs, cor de metadado)          selo/estado (txt-xs)
+```
+
+Três regras que a mantêm igual em toda tela:
+
+1. **Uma coisa por coluna.** Tudo o que é contexto — categoria, origem, data,
+   recorrência, parcela — cabe na linha de metadado, separado por `·`. Chip no
+   meio do título empurra o título para baixo e faz cada linha ter uma altura.
+2. **O ladrilho nunca falta.** Sem categoria, ele fala pelo tipo do item ou fica
+   neutro — nunca some, senão o alinhamento da lista inteira quebra naquela
+   linha.
+3. **O estado é palavra, não pílula**, quando aparece embaixo do valor: uma
+   coluna de badges à direita compete com a coluna de valores, que é o que a
+   pessoa está lendo.
+
 ### 8.15 Botão de voltar
 
 ```tsx
@@ -2050,6 +2098,12 @@ Antes de dar uma tela por pronta:
 - [ ] O que é `fixed` dentro da tela vai por portal — a animação de entrada é
       bloco de contenção.
 - [ ] A tela registrou a sua ação principal, e não criou um "+" próprio.
+- [ ] Cartão de valor: um por linha no celular, e o mesmo degrau de número em
+      todos os cartões da tela.
+- [ ] Escolha (campo, dropdown, aba, filtro, passo de mês) usa o raio de campo;
+      a pílula é de chip, badge, botão de ícone e navegação.
+- [ ] Linha de lista: uma coisa por coluna, ladrilho sempre presente, estado em
+      palavra e não em pílula ao lado do valor.
 - [ ] Todo controle é um componente do sistema, não uma `<div>` estilizada.
 - [ ] Quem tem `outline-none` tem `foco-anel` junto.
 - [ ] Botão só com ícone tem rótulo acessível.
