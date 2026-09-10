@@ -128,7 +128,7 @@ Candidatos típicos, e o que fazer com cada um:
 | Biblioteca                   | Estratégia                                        |
 | ---------------------------- | ------------------------------------------------- |
 | Editor de texto rico         | dinâmico + montagem adiada (ver §14.1)            |
-| Gráficos                     | dinâmico, por rota                                |
+| Gráficos                     | dinâmico, **num módulo só** (ver abaixo)          |
 | Geração de PDF / captura DOM | `import()` só no clique de exportar               |
 | Confete / animação de festa  | `import()` no momento da celebração               |
 | Zoom/pan de imagem           | dinâmico                                          |
@@ -137,6 +137,13 @@ Candidatos típicos, e o que fazer com cada um:
 Some a isso a otimização de importação por barril (`optimizePackageImports` para
 pacotes de ícones, gráficos e datas): ela reescreve `import { X } from "pacote"`
 para o módulo interno e evita arrastar o índice inteiro.
+
+**Um import dinâmico por componente pode duplicar a biblioteca.** Dois gráficos
+em dois arquivos, cada um com o seu `next/dynamic`, viraram **dois chunks de
+330 KB** — a mesma biblioteca, baixada duas vezes, na mesma tela. O empacotador
+não junta o que você separou. Se dois componentes dinâmicos dependem da mesma
+biblioteca pesada, ponha-os **no mesmo módulo**: um módulo, um chunk, uma cópia.
+Confira medindo o que a tela baixa, não lendo o código.
 
 **Contraexemplo:** não adie o que o usuário vê em menos de um segundo. Carregar
 dinamicamente o cabeçalho da página só troca um custo por um piscar.
@@ -227,7 +234,32 @@ e a lista dentro dela volta vazia — que é meio caminho e parece defeito.
 depois de ter rolado até março e cair em janeiro é o mesmo defeito com outra
 cara.
 
-### 4.6 A janela de frescor: 20 segundos sem perguntar nada
+### 4.6 O `getUser()` do middleware, uma vez por navegação
+
+O padrão que todo guia de autenticação ensina — validar a sessão no middleware —
+cobra **uma ida à rede ao provedor de identidade em cada requisição**, inclusive
+em cada payload de rota que o roteador busca ao navegar. É o custo fixo mais
+caro do vaivém entre telas, e ele não aparece em nenhum perfil de JavaScript.
+
+A correção é ler o vencimento do token **do próprio cookie** e só ir à rede
+quando falta pouco (uma margem de ~120 s):
+
+```ts
+const restam = segundosRestantes(request); // exp do JWT, lido localmente
+if (!portaDeEntrada && restam !== null && restam > 120) return response;
+```
+
+Três cuidados, e o terceiro é o que quebra:
+
+1. **Isto não é autorização.** É só a decisão de renovar ou não. Quem autoriza é
+   a checagem no servidor da própria tela, e a regra de acesso no banco.
+2. Sem cookie, ou com formato inesperado, **caia no caminho completo**.
+3. **As portas de entrada ficam de fora do atalho.** `/`, `/entrar` e
+   `/cadastro` decidem para onde a pessoa vai: mandar alguém para a tela inicial
+   com um token que o servidor já recusou faz a tela devolver para o login, e o
+   login devolver para a tela inicial — um pingue-pongue infinito.
+
+### 4.7 A janela de frescor: 20 segundos sem perguntar nada
 
 Ter cache não basta se toda montagem dispara a revalidação assim mesmo: a tela
 abre cheia, e um segundo depois pisca com a mesma resposta.
@@ -259,7 +291,7 @@ inscrever(() => {
 Sem isso, voltar para a lista nos 20 segundos seguintes a salvar mostra a lista
 de antes — sem a coisa que a pessoa acabou de criar. É pior do que lentidão.
 
-### 4.7 Não pinte o que não mudou
+### 4.8 Não pinte o que não mudou
 
 A revalidação de fundo quase sempre devolve **exatamente** o que já está na
 tela. Trocar o estado assim mesmo faz a tela inteira renderizar de novo — e, se
@@ -283,7 +315,7 @@ if (mesmaLista) {
 Compare por **identidade + carimbo de atualização**, não por conteúdo inteiro:
 é O(n) e não depende de serializar objeto.
 
-### 4.8 Respostas fora de ordem
+### 4.9 Respostas fora de ordem
 
 Trocar de filtro depressa dispara buscas que voltam **fora de ordem**, e a mais
 lenta chega por último e pinta a lista dela por cima da tela que já mostra
@@ -303,7 +335,7 @@ Esquecer a segunda é sutil e apareceu em produção: a resposta obsoleta deslig
 o esqueleto do filtro novo, e a lista anterior ficava na tela sem sinal nenhum
 de carregamento — como se aquele fosse o resultado.
 
-### 4.9 Cuidado: Suspense recria efeitos
+### 4.10 Cuidado: Suspense recria efeitos
 
 Quando um componente carregado por `next/dynamic` suspende, o React **esconde a
 árvore e, ao mostrá-la de volta, recria os efeitos** — mantendo estado e refs.
@@ -944,6 +976,10 @@ Antes de dar uma tela por pronta:
 - [ ] O orçamento de bundle continua passando — **por rota**, não só o total.
 - [ ] `staleTimes` do roteador está configurado; voltar não remonta a tela.
 - [ ] Existe janela de frescor (20 s), e escrever a invalida.
+- [ ] O middleware não paga um `getUser()` por navegação quando não há o que
+      renovar — e as portas de entrada ficam fora do atalho.
+- [ ] Dois componentes dinâmicos que usam a mesma biblioteca pesada moram no
+      mesmo módulo (senão são duas cópias).
 - [ ] Revalidação que devolve o mesmo resultado **não** repinta a tela.
 - [ ] Resposta obsoleta não pinta nem desliga o esqueleto da atual.
 - [ ] Tela cheia faz `prefetch` da rota de volta ao montar.
@@ -969,8 +1005,8 @@ uma linha de configuração e um `Map` em módulo.
 
 **2. A tela abre cheia e "recarrega" um segundo depois?**
 Três causas, nesta ordem de frequência: revalidação repintando resultado
-idêntico (§4.7), o detalhe refazendo a busca a cada aviso do repositório (§4.6,
-janela de 60 s), e transição de view rodando em toda revalidação (§4.7).
+idêntico (§4.8), o detalhe refazendo a busca a cada aviso do repositório (§4.7,
+janela de 60 s), e transição de view rodando em toda revalidação (§4.8).
 
 **3. Quanto pesa a ROTA, não o app?**
 Meça por rota (§2.1). Um único `import` no topo de um arquivo pode custar

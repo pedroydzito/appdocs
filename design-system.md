@@ -92,6 +92,19 @@ raiz.style.colorScheme = escuro ? "dark" : "light";
 raiz.classList.toggle("contraste-alto", contraste === "alto");
 ```
 
+### Duas armadilhas do CSS por utilitário
+
+As duas custaram uma tarde cada, e nenhuma delas dá erro:
+
+- **Variante não pega em classe de componente.** `hover:cartao`,
+  `focus:superficie-2`, `data-[state=open]:superficie-2` — nada disso existe: a
+  variante só compõe com **utilidade**, e uma classe declarada em
+  `@layer components` não é uma. O CSS compila, a classe some, e o hover
+  simplesmente não acontece. Ou exponha o token como cor no `@theme inline`
+  (`hover:bg-superficie-2`) ou escreva a regra `:hover` dentro da própria classe.
+- **Variável declarada e não usada é removida.** Ver §3.1: a escala inteira
+  precisa existir em `:root`, não só dentro de `@theme`.
+
 ### Fontes
 
 Três famílias, e **só os pesos que a interface desenha de fato** — eram doze
@@ -137,6 +150,26 @@ lugares que precisam de mais ou menos contraste.
   --color-acento-950: #400e0a;
 }
 ```
+
+**Declare os onze degraus em `:root` e faça a ponte no `@theme inline`.** Uma
+variável que só existe dentro de `@theme` e que nenhuma regra usa é **removida
+na compilação** — e o resultado é sutil: o botão continua certo (o 500 é usado
+pelos papéis), mas a página de estilo mostra metade da escala transparente, e
+qualquer `bg-acento-200` escrito depois não pinta nada.
+
+```css
+:root {
+  --acento-50: #fef0ee;
+  /* … os onze … */
+}
+@theme inline {
+  --color-acento-50: var(--acento-50);
+  /* … os onze … */
+}
+```
+
+Assim as utilidades do Tailwind continuam existindo, o alto contraste continua
+podendo reescrever a escala inteira, e nada some por falta de uso.
 
 ### 3.2 Papéis, não cores
 
@@ -419,6 +452,19 @@ mesmo papel (1.75/2.25, 2.25/2.75, 2.5 fixo e 3.5/4.5). Quando um papel aparece
 duas vezes com números diferentes, o certo não é escolher um: é **dar nome aos
 dois degraus** e usar só eles.
 
+E um terceiro, que só aparece quando o cartão **divide a linha** com outro:
+
+| Classe                  | Tamanho                                    | Papel                                  |
+| ----------------------- | ------------------------------------------ | -------------------------------------- |
+| `.txt-numero-estreito`  | `.txt-xl` até `sm`, depois `.txt-numero`   | número em cartão que divide a linha    |
+
+O `.txt-numero` foi medido para um cartão de largura inteira. Num mosaico de
+duas colunas no celular, o cartão tem ~45% da tela, e um valor com separador de
+milhar (`R$ 2.479,50`) **transborda a caixa** — o texto sai pela borda do
+cartão, que é o defeito visual mais fácil de deixar passar porque só aparece
+com dado real e comprido. Não invente um tamanho no meio: componha os degraus
+que já existem, e mude no ponto de quebra.
+
 ### 4.2 Os três gestos tipográficos
 
 ```css
@@ -450,6 +496,21 @@ dois degraus** e usar só eles.
 }
 ```
 
+**A sobrancelha é curta, e não é rótulo de tudo.** Duas armadilhas, as duas
+vistas em produção:
+
+- **Sobrancelha que vira duas linhas deixou de ser sobrancelha.** Caixa alta com
+  `letter-spacing` ocupa ~30% mais que a mesma frase em caixa baixa; uma frase
+  como "contas a pagar e receber, parcelas e recorrências" quebra em duas linhas
+  no celular e passa a competir com o título que ela deveria apresentar. Se não
+  cabe numa linha estreita, não é contexto: é descrição, e desce para o corpo.
+- **Rótulo de ajuste e de campo de formulário é frase, não sobrancelha.** Numa
+  tela de ajustes com dez linhas, dez rótulos em caixa alta viram ruído e a
+  descrição embaixo fica ilegível por contraste de peso. O rótulo de um campo de
+  formulário usa a sobrancelha (ele é um por bloco, e é o contexto do controle);
+  o de uma **linha de ajuste** é `.txt-sm font-medium`, com a descrição em
+  `.txt-xs` na cor de metadado.
+
 ### 4.3 Cor do texto
 
 `.t2` → `--texto-2` (apoio). `.t3` → `--texto-3` (metadado). O texto principal
@@ -457,11 +518,19 @@ não precisa de classe: o `body` já o define.
 
 ### 4.4 Base
 
+**O `body` declara o tamanho do corpo.** Sem isso, todo texto sem classe cai nos
+**16px do navegador** — que é maior que qualquer degrau da escala. O sintoma não
+é "um texto errado": é a sensação de que a interface tem dois tamanhos
+brigando, porque metade dos textos passou pela escala e a outra metade não. A
+escala só é a escala quando o padrão também é dela.
+
 ```css
 body {
   background-color: var(--fundo);
   color: var(--texto);
   font-family: var(--font-sans);
+  font-size: 0.9375rem; /* .txt-md — o degrau do corpo */
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overscroll-behavior-y: none;
@@ -1033,6 +1102,7 @@ O preço, medido no app de referência:
 | Raio de canto           |    244 | quatro raios para o mesmo papel                     |
 | Véu sobre foto          |      5 | o mesmo botão mais escuro numa tela que na outra    |
 | Estado vazio            |      3 | dois na MESMA tela, com linguagens diferentes       |
+| Ladrilho de ícone       |      6 | três tamanhos e duas formas para o mesmo papel      |
 | Duração de transição    |      5 | 300 ms, 320 ms e 500 ms para gestos irmãos          |
 
 Repare no padrão: **a cópia nunca dói na hora**. Ela dói no dia em que uma
@@ -1242,7 +1312,20 @@ Existia repetido em quatro telas, e cada cópia pintava o fundo com o acento —
 inclusive as de erro. Dizer "não consegui salvar" com a mesma cor do botão
 "Salvar" não avisa ninguém.
 
-### 8.9 Esqueleto
+### 8.9 Sanfona (`<details>`)
+
+Use `<details>/<summary>` para pergunta-e-resposta: ele já traz teclado,
+`aria-expanded` e busca-na-página de graça. Duas linhas o colocam no sistema:
+
+```css
+summary::-webkit-details-marker { display: none; }  /* o triângulo do navegador */
+```
+
+…e o indicador vira um ícone de 16px que gira 180° com `group-open:rotate-180`.
+Deixar o marcador nativo é a única parte do app com um glifo que não é do
+sistema de ícones — e ele muda de desenho a cada navegador.
+
+### 8.10 Esqueleto
 
 ```tsx
 <Esqueleto className="h-8 w-40" arredondado="var(--raio-m)" />
@@ -1274,7 +1357,7 @@ inclusive as de erro. Dizer "não consegui salvar" com a mesma cor do botão
 tela pular quando o conteúdo real entra — o esqueleto do cartão tem metadado,
 título, duas linhas de prévia e duas pílulas, nas mesmas medidas do cartão.
 
-### 8.10 Estado vazio
+### 8.11 Estado vazio
 
 ```tsx
 <EstadoVazio icone={<Users />} titulo="…" descricao="…" acao={<BotaoLink …/>} />
@@ -1286,19 +1369,19 @@ max-w-xs`; ação 20px abaixo.
 
 **Diz o que houve e oferece a saída.** Vazio sem botão é beco sem saída.
 
-### 8.11 Botão de salvar
+### 8.12 Botão de salvar
 
 Três estados numa peça só: parado → salvando (encolhe para `w-14` círculo em
 320ms, com o rótulo sumindo antes) → salvo (pulso `.animar-salvo` de 420ms e o
 check se desenhando em `.animar-tique`).
 
-### 8.12 Avisos (toast)
+### 8.13 Avisos (toast)
 
 `useAviso()` com `.info() .sucesso() .erro()`, sobre `z-70`.
 
 **Nunca use `alert()`.**
 
-### 8.13 Cartão
+### 8.14 Cartão
 
 Não é componente de biblioteca, é padrão: `.cartao` + `.interativo` + `p-5`,
 com esta ordem interna:
@@ -1314,7 +1397,7 @@ O cartão tingido por categoria usa `::before` com um `radial-gradient` da cor e
 22%, que aparece no hover junto de uma borda em 45% da mesma cor — a cor entra
 como luz, não como preenchimento.
 
-### 8.14 Botão de voltar
+### 8.15 Botão de voltar
 
 ```tsx
 <BotaoVoltar aoVoltar={() => router.back()} trocaDeRota />
@@ -1333,7 +1416,7 @@ tocadas enquanto a tela de destino montava.
 ou volta uma etapa dentro da mesma tela. Acender o indicador nesses casos o
 deixa pendurado esperando uma navegação que não vem.
 
-### 8.15 Só com internet / só com o recurso
+### 8.16 Só com internet / só com o recurso
 
 ```tsx
 <SoOnline motivo="Isto precisa de internet">{botao}</SoOnline>
@@ -1353,7 +1436,7 @@ Duas exigências de implementação:
 O mesmo invólucro serve para recurso de plano pago (`SoComIa` e afins): mesma
 gramática, motivo diferente.
 
-### 8.16 Seleção múltipla
+### 8.17 Seleção múltipla
 
 Um padrão, usado igual em toda lista que permite apagar ou mover em lote:
 
@@ -1364,15 +1447,52 @@ Um padrão, usado igual em toda lista que permite apagar ou mover em lote:
    cartão marcado. Redonda porque, numa lista que já tem foto, ícone e chip, um
    quadrado vazio vira mais um enfeite.
 4. As ações do cartão **somem** durante a seleção: quem manda é a barra.
-5. Barra **grudada embaixo** (`sticky bottom-0` + `pb-segura`), com "Selecionar
-   todos", a contagem e as ações. No fim de uma lista longa, um botão no rodapé
-   custaria a rolagem inteira de volta.
+5. Barra **grudada embaixo**, com "Selecionar todos", a contagem e as ações. No
+   fim de uma lista longa, um botão no rodapé custaria a rolagem inteira de
+   volta. Se ela for `fixed` (e não `sticky`), ela é a `<BarraFlutuante>` de
+   §8.18 — com portal —, senão a animação de entrada da tela a prende no fim do
+   conteúdo.
 
 Em lote, aja **em série** e conte o que falhou, em vez de morrer no primeiro
 erro: dez escritas em paralelo na mesma coleção produzem escrita por cima de
 escrita.
 
-### 8.17 Estado com prazo: data + selo
+### 8.18 Barra flutuante — e por que ela precisa de portal
+
+A barra que aparece acima da navegação (o total da seleção, um "desfazer", um
+aviso de rascunho) parece um `position: fixed` e nada mais. Não é.
+
+> **Um ancestral com `transform` animado vira bloco de contenção, e o `fixed`
+> passa a se medir por ele.**
+
+Como toda tela deste sistema entra animando (`.animar-tela`) e os blocos entram
+encadeados (`transform` em `@keyframes`), **qualquer** barra fixa escrita dentro
+da página cai nessa armadilha. O sintoma engana: a barra aparece no **fim do
+conteúdo** em vez do rodapé da janela, e some ao rolar — e ninguém suspeita da
+animação, porque o CSS da barra está certo. Pior: some quando a animação
+termina? Não — a animação com `fill-mode: both` continua "aplicando" o valor
+final, e o bloco de contenção continua de pé.
+
+A correção é uma linha de arquitetura, não de CSS:
+
+```tsx
+return createPortal(<div className="fixed …">{children}</div>, document.body);
+```
+
+No `body` não há ancestral que a capture. E, já que ela é um componente:
+
+| Peça               | Valor                                                                     |
+| ------------------ | ------------------------------------------------------------------------- |
+| Camada             | `--z-avisos` — acima do conteúdo, abaixo de folha e visor                 |
+| Celular            | `inset-x-4`, `bottom: calc(var(--altura-nav) + safe-area + 0.5rem)`       |
+| Desktop            | canto inferior direito, com respiro para não colidir com a bolha do chat  |
+| Entrada            | `.animar-surgir`                                                          |
+
+**Vale para tudo que é `fixed` dentro de uma tela animada**: menu que brota de
+um botão, tooltip posicionado à mão, folha escrita sem o componente. Se algo
+"fixo" apareceu no lugar errado, o primeiro suspeito é o ancestral animado.
+
+### 8.19 Estado com prazo: data + selo
 
 Quando um cartão precisa dizer "até quando" e "isto se renova sozinho?", **não
 escreva uma frase**. Uma frase diz as duas coisas ao mesmo tempo e não deixa
@@ -1613,6 +1733,18 @@ lista                            [--i:3]
 - **Filtros**: `ChipBotao`. Ao mudar o filtro, os cartões que saem são
   empurrados para fora (fantasma `fixed`, 420ms) e os que ficam se reacomodam
   por FLIP.
+  - **Chips não quebram linha.** Quatro filtros numa tela estreita viram duas
+    fileiras, com um chip órfão embaixo. Uma fileira só, com rolagem lateral
+    (`overflow-x: auto` e barra escondida), e os chips com `shrink-0`.
+  - **Uma escolha por linha de controle, e o dropdown vem antes do chip.** Um
+    campo de busca, uma fileira de dropdowns e uma fileira de chips empilhados
+    ocupam meia tela antes do primeiro item da lista; no celular, dois
+    dropdowns dividem a mesma linha.
+- **Ladrilho do ícone**: um componente, e ele **nunca fica vazio**. Ele aparece
+  em toda lista do app — foi assim que virou seis cópias com três tamanhos. Sem
+  categoria (ou sem cor), o ladrilho é neutro, ou fala pelo tipo do item: um
+  ícone solto, sem a caixa, desalinha todas as linhas em volta e parece defeito
+  de carregamento.
 - **Lista**: agrupada por dia; cada grupo entra com `.revela-ao-rolar` ao montar.
   No desktop os cartões do mesmo dia viram uma fileira horizontal com encaixe:
 
@@ -1836,6 +1968,32 @@ destinos visíveis + menu) funciona de 4 a 8 destinos. Ajuste:
   coluna. Se o seu app não tem uma ação principal única, tire o botão em vez de
   inventar uma.
 
+**A ação principal é da TELA, não do app.** O "+" da navegação cria uma conta em
+"contas", um cartão em "cartões", um agendamento na agenda — e cai na ação do
+app só onde a tela não registrou nenhuma. Isso resolve, de uma vez, o defeito
+que aparece sozinho em todo app com listas: **cada tela nasce com o seu próprio
+"+"**, um no topo, outro flutuando, e a pessoa passa a ter dois botões de criar
+na mesma tela, em lugares diferentes, fazendo coisas diferentes.
+
+A mecânica é um contexto e um hook:
+
+```tsx
+// Na tela:
+useDefinirAcaoPrincipal("Nova conta", () => setAbrindo(true));
+```
+
+Dois detalhes de implementação, e o segundo é o que quebra:
+
+- O registro vive num contexto acima da navegação **e** do `<main>`, senão a
+  barra não enxerga o que a tela registrou.
+- **Guarde o callback num `ref` e registre um invólucro estável.** `aoAcionar` é
+  quase sempre uma arrow inline, nova a cada render: registrá-la direto é um
+  `setState` por render — laço infinito, tela branca, e um "Maximum update
+  depth" como única pista.
+
+E as ações **secundárias** da tela (sincronizar, importar, filtrar) não disputam
+esse lugar: no celular vão para a faixa da marca; no desktop, para o cabeçalho.
+
 ### 14.4 O que é tela e não é sistema
 
 Categorias coloridas, exportação em PDF, editor de texto rico, gravação de voz,
@@ -1883,6 +2041,15 @@ Se você mexer nisto, o resultado deixa de parecer o mesmo produto:
 Antes de dar uma tela por pronta:
 
 - [ ] Nenhum hexadecimal, `ms`, `px` de raio ou `text-[..px]` escrito à mão.
+- [ ] O `body` declara o tamanho do corpo — nada cai nos 16px do navegador.
+- [ ] Nenhuma variante apontando para classe de componente (`hover:superficie-2`
+      não existe, e falha em silêncio).
+- [ ] Número em cartão que divide a linha usa o degrau estreito: com dado real e
+      comprido, o texto não sai pela borda.
+- [ ] Sobrancelha cabe em uma linha; rótulo de ajuste é frase, não caixa alta.
+- [ ] O que é `fixed` dentro da tela vai por portal — a animação de entrada é
+      bloco de contenção.
+- [ ] A tela registrou a sua ação principal, e não criou um "+" próprio.
 - [ ] Todo controle é um componente do sistema, não uma `<div>` estilizada.
 - [ ] Quem tem `outline-none` tem `foco-anel` junto.
 - [ ] Botão só com ícone tem rótulo acessível.
