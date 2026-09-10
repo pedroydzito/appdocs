@@ -946,6 +946,65 @@ mundos), a abertura logo depois da troca vai à rede. É uma abertura lenta por
 publicação, contra a garantia de que ninguém fica para trás. Vale; só não
 confunda essa abertura com a otimização de §8.4 tendo falhado.
 
+### 8.6 O que roda na abertura não pode abrir janela
+
+Este não é bem um item de desempenho — é um item de **abertura**, e ele entra
+aqui porque só aparece depois que você conserta §8.4.
+
+Todo app acumula um punhado de tarefas que rodam "no ocioso, quando o app
+abre": sincronizar, aquecer cache, um backup automático, renovar uma permissão.
+Enquanto o app demora três segundos para abrir, boa parte dessas tarefas nunca
+chega a rodar — a pessoa já está fazendo outra coisa, ou fechou. **Quando a
+abertura fica instantânea, todas elas passam a rodar, cedo e sempre.** É por
+isso que uma otimização de abertura costuma vir acompanhada de um bug que
+"apareceu do nada": ele estava lá, disparando de vez em quando.
+
+A regra: **nada que rode sem um toque da pessoa pode abrir uma janela, um
+popup, uma aba ou um diálogo do sistema.**
+
+E o jeito mais fácil de violá-la é acreditar num nome. O caso que custou caro:
+
+> O cliente de **token** do Google Identity Services abre uma janela SEMPRE.
+> `prompt: "none"` pula a tela de consentimento — **não** a janela.
+
+No computador ela pisca e fecha, então a suposição errada sobrevive anos. No
+celular, com o app instalado, ela vira uma aba do navegador por cima do app,
+com o cartão de carregamento do provedor, em toda abertura.
+
+Dois agravantes que transformam "às vezes" em "sempre", e que valem para
+qualquer tarefa periódica:
+
+- **Só marque como feito o que de fato aconteceu** — e então cuide para que o
+  fracasso não seja gratuito. Se a marca de "última execução" só é gravada no
+  sucesso, uma tarefa que falha continua vencida e **tenta de novo em toda
+  abertura, para sempre**. Ou a tentativa é barata e calada (o certo), ou
+  precisa de uma espera crescente entre tentativas.
+- **Uma automação que só funciona com autorização interativa não é uma
+  automação.** Ou ela roda com uma credencial que renova sozinha (do lado do
+  servidor), ou ela é oportunista — roda quando a credencial já está viva — e a
+  interface diz a verdade sobre quando rodou pela última vez. O que não pode é
+  o meio-termo: tentar interativamente sem ninguém pedindo.
+
+**Como auditar isto no seu app**, e vale meia hora: liste tudo o que dispara no
+`load` e no primeiro ocioso, e para cada item pergunte se ele pode abrir alguma
+coisa — `window.open`, um cliente de OAuth, `requestPermission` de notificação
+ou de geolocalização, um seletor de arquivo, `showInstallPrompt`. Toda API que
+pede permissão ao sistema deve nascer de um gesto; o navegador até bloqueia
+algumas fora do gesto, mas as que ele deixa passar são justamente as que
+aparecem em cima do seu app.
+
+O teste que segura isso é simples e vale a pena escrever: **transforme a janela
+num espião**. Se o caminho automático encostar nela, o teste cai.
+
+```ts
+const requestAccessToken = vi.fn();
+// … roda o caminho automático três vezes, como três aberturas do app
+expect(requestAccessToken).not.toHaveBeenCalled();
+```
+
+Escreva-o de forma que ele **falhe com o código antigo** antes de dar por
+resolvido — um teste que passaria dos dois jeitos não protege nada.
+
 ---
 
 ## 9. Imagens
@@ -1327,6 +1386,9 @@ Antes de dar uma tela por pronta:
 - [ ] A versão nova do worker é aplicada na PORTA (esperando na abertura, ou
       instalada antes do primeiro toque) e convidada no meio do uso — ninguém
       fica mais de uma abertura atrás.
+- [ ] Nada que roda no `load` ou no primeiro ocioso abre janela, popup ou
+      diálogo de permissão. Auditado item a item — e não pelo nome da opção
+      (`prompt: "none"` não quer dizer "sem janela").
 - [ ] Só as famílias e os pesos de fonte que a interface desenha de fato, e no
       `preload` só as que estão no primeiro quadro.
 - [ ] Dois componentes dinâmicos que usam a mesma biblioteca pesada moram no
@@ -1366,6 +1428,10 @@ Meça por rota (§2.1). Um único `import` no topo de um arquivo pode custar
 **3-b. Voltar para o app recarrega tudo?**
 Não é o sistema descartando a aba: é `no-store` no documento desligando o
 bfcache. → §7.7. Uma linha no middleware.
+
+**3-b-2. Depois de acelerar a abertura, apareceu um popup/aba do nada?**
+Não apareceu: ele já existia e agora dá tempo de disparar. Tarefas de ocioso
+que antes quase nunca rodavam passam a rodar em toda sessão. → §8.6.
 
 **3-c. A ABERTURA demora, mas a navegação já está rápida?**
 São problemas diferentes e não se resolvem no mesmo lugar. Se o app instalado
