@@ -418,13 +418,46 @@ Para a comparação rasa do `memo` funcionar, a camada de dados precisa **trocar
 objeto só quando o dado muda de verdade**. Se cada busca recria todos os
 objetos, o `memo` não segura nada.
 
-### 6.3 `useMemo` onde há derivação real
+### 6.3 `useMemo` morre na navegação — a derivação cara vive no módulo
+
+`useMemo` guarda o resultado **enquanto o componente vive**. Numa moldura que
+remonta a tela a cada navegação — e ela remonta, porque é o `key={caminho}` que
+faz a animação de entrada rodar de novo (§9.3 do design system) — toda derivação
+cara é refeita do zero **a cada ida e volta entre abas**. É invisível no perfil
+de uma tela só, e é metade do "trocar de aba demora".
+
+O cache vai para o módulo, fora do React, com a **identidade dos dados** como
+chave:
+
+```ts
+export function memoModulo<C extends readonly unknown[], V>(calcular: (...c: C) => V) {
+  let anterior: { chaves: C; valor: V } | null = null;
+  return (...chaves: C): V => {
+    if (anterior && anterior.chaves.every((c, i) => c === chaves[i])) return anterior.valor;
+    const valor = calcular(...chaves);
+    anterior = { chaves, valor };
+    return valor;
+  };
+}
+```
+
+Guardar **só o último** resultado é de propósito: é o que o vaivém usa, e não
+vira vazamento. Funciona porque a camada de dados troca o objeto só quando o
+dado muda de verdade (§6.2) — se cada busca recria os arrays, isto não segura
+nada, e o `memo()` das células também não.
+
+E, antes de memoizar, **conte as varreduras**. Um gráfico de doze meses escrito
+com um `filter` por mês e por tipo faz 72 varreduras completas da lista a cada
+montagem; a mesma conta numa passada só, com um mapa de mês para índice, é
+O(n). Memoizar uma conta O(72n) é esconder o problema, não resolvê-lo.
+
+### 6.4 `useMemo` onde há derivação real
 
 Filtro, agrupamento, ordenação e contagem sobre a lista inteira: sim. Concatenar
 duas strings: não. `useMemo` tem custo próprio; usá-lo em tudo só adiciona
 trabalho.
 
-### 6.4 Anime layout com FLIP, não com layout
+### 6.5 Anime layout com FLIP, não com layout
 
 Quando uma lista se reordena, meça a posição antes e depois, aplique a inversão
 sem transição e devolva ao normal em uma transição de `transform`. Animar
@@ -564,6 +597,32 @@ Vale igual para `MediaRecorder` (parar o gravador, não só as trilhas),
 `AudioContext` (fechar), `WakeLock` (liberar) e handles do sistema de arquivos.
 
 ---
+
+### 7.7 O app "recarrega" quando a pessoa volta para ele
+
+Sintoma: a pessoa sai do app, atende uma mensagem, volta — e a tela remonta do
+zero, perdendo a rolagem e o estado. Parece descarte de aba pelo sistema, e às
+vezes é. Mas na maioria dos casos é o **bfcache desligado por um cabeçalho**.
+
+> O navegador não guarda no bfcache uma página cujo documento veio com
+> `Cache-Control: no-store` — e `no-store` é o padrão de toda rota renderizada
+> sob demanda no Next (e equivalentes).
+
+Trocar por `private, no-cache, max-age=0, must-revalidate` mantém a revalidação
+em toda navegação (nada obsoleto é servido) e devolve o bfcache: voltar para o
+app passa a restaurar a página **como ela estava**, instantaneamente, sem
+requisição nenhuma.
+
+Onde escrever isso: no middleware, na resposta de navegação — e **só nela**. As
+rotas de API têm cabeçalho próprio (um stream de modelo precisa do `no-store`
+dele), então exclua `/api/` da regra.
+
+As outras coisas que desligam o bfcache, e que vale conferir junto:
+
+- um ouvinte de `unload` (use `pagehide`);
+- uma conexão aberta que o navegador não sabe pausar (`WebSocket`, `EventSource`)
+  — feche-a em `pagehide` e reabra em `pageshow`;
+- `window.opener` vivo.
 
 ## 8. Offline-first
 
@@ -978,6 +1037,11 @@ Antes de dar uma tela por pronta:
 - [ ] Existe janela de frescor (20 s), e escrever a invalida.
 - [ ] O middleware não paga um `getUser()` por navegação quando não há o que
       renovar — e as portas de entrada ficam fora do atalho.
+- [ ] O documento de navegação **não** vai com `no-store` — senão não há
+      bfcache, e voltar para o app recarrega tudo.
+- [ ] Derivação cara de tela vive num memo de módulo, não num `useMemo` que
+      morre na navegação.
+- [ ] Só as famílias e os pesos de fonte que a interface desenha de fato.
 - [ ] Dois componentes dinâmicos que usam a mesma biblioteca pesada moram no
       mesmo módulo (senão são duas cópias).
 - [ ] Revalidação que devolve o mesmo resultado **não** repinta a tela.
@@ -1011,6 +1075,10 @@ janela de 60 s), e transição de view rodando em toda revalidação (§4.8).
 **3. Quanto pesa a ROTA, não o app?**
 Meça por rota (§2.1). Um único `import` no topo de um arquivo pode custar
 200 KB numa tela que nunca usa aquilo. → §2.2.
+
+**3-b. Voltar para o app recarrega tudo?**
+Não é o sistema descartando a aba: é `no-store` no documento desligando o
+bfcache. → §7.7. Uma linha no middleware.
 
 **4. O primeiro toque de cada sessão demora?**
 Alguma checagem síncrona de servidor está no caminho do clique — permissão,
