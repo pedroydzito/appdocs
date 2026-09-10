@@ -584,6 +584,13 @@ descreve a realidade não é seguida — é contornada.
 
 68 caracteres é onde o olho não se perde na volta da linha.
 
+**Reserve a calha da barra de rolagem**: `scrollbar-gutter: stable` no `html`.
+Sem isso, ir de uma tela curta para uma que rola tira ~15px da largura útil e
+**todo** o conteúdo salta para a esquerda por um instante, a cada navegação —
+o tipo de tremor que ninguém sabe nomear mas todo mundo sente. Uma linha, e
+vale para o app inteiro. A prova é mecânica: `document.documentElement.
+clientWidth` tem que dar o mesmo número numa tela curta e numa longa.
+
 ### 5.3 Raio
 
 | Token           | Valor   | Onde                                     |
@@ -600,11 +607,23 @@ exatamente esse o defeito que originou a classe `.campo-busca`.
 
 **A forma diz o papel, e a pílula é de rótulo — não de escolha.** Tudo que
 mostra ou recebe um **valor escolhido** usa o raio de campo: campo de busca,
-dropdown, aba, filtro, passo de mês, segmentado. A pílula fica para o que é
-**rótulo ou alvo**: chip, badge, botão só de ícone, a barra de navegação, a
-barra de progresso. Misturar os dois é o defeito que mais aparece em revisão —
-um filtro totalmente arredondado ao lado de um dropdown de raio de campo, na
-mesma linha, lendo como dois sistemas.
+dropdown, aba, filtro, passo de mês. A pílula fica para o que é **rótulo ou
+alvo**: chip, badge, botão só de ícone, a barra de navegação, a barra de
+progresso, o **segmentado**. Misturar os dois é o defeito que mais aparece em
+revisão — um filtro totalmente arredondado ao lado de um dropdown de raio de
+campo, na mesma linha, lendo como dois sistemas.
+
+**E não é só o raio: é a casca inteira.** Um filtro ao lado do campo de busca
+precisa da mesma superfície e da mesma moldura dele. Um select de fundo chapado
+encostado num campo com moldura tem o mesmo raio e continua lendo como duas
+peças de sistemas diferentes — o raio resolve metade do problema. Daí a
+variante: o mesmo `<Select>` usa a casca do campo de busca **fora** de
+formulário e a casca do `<Input>` **dentro** dele. A regra é sempre a mesma:
+**pareça com o vizinho da linha**.
+
+**Segmentado**: raio de pílula, altura de botão (44px), e `w-full` abaixo de
+`sm`. Dois botõezinhos encostados na margem esquerda desperdiçam a linha e dão
+alvos menores que o dedo, num controle que existe justamente para ser tocado.
 
 ### 5.4 Elevação
 
@@ -798,6 +817,31 @@ mais distante do clique. E enquanto uma View Transition roda, a animação de ro
 é desligada (`html[data-transicao] .animar-tela { animation: none }`), senão as
 duas brigam.
 
+**Duas armadilhas fazem a onda "parar no meio", e as duas são silenciosas:**
+
+1. **A transição padrão continua rodando por baixo.** O navegador cruza-desvanece
+   as duas fotografias por conta própria; a onda aparece por cima de um fundo
+   meio transparente e some antes de chegar ao canto. Desligue as duas:
+
+   ```css
+   html[data-transicao="onda"]::view-transition-old(root),
+   html[data-transicao="onda"]::view-transition-new(root) {
+     animation: none;
+     mix-blend-mode: normal;
+   }
+   html[data-transicao="onda"]::view-transition-old(root) { z-index: 0; }
+   html[data-transicao="onda"]::view-transition-new(root) { z-index: 1; }
+   ```
+
+   A foto antiga fica parada embaixo, inteira, e a nova é revelada **só** pelo
+   clip-path.
+
+2. **`circle(0% …)` e `circle(${raio}px …)` são unidades diferentes.** Escreva
+   `circle(0px …)` no primeiro quadro. Misturar porcentagem e pixel numa
+   interpolação de `clip-path` dá um salto no meio do caminho, e a distância
+   percorrida depende do tamanho da janela — que é exatamente o sintoma de "vai
+   só até a metade da tela".
+
 **Cuidado com `backdrop-filter`:** um elemento com `view-transition-name` é
 fotografado e promovido para a camada da transição, e lá dentro o
 `backdrop-filter` não tem o que amostrar. Foi isso que fazia o desfoque da barra
@@ -837,7 +881,18 @@ reduzido.
 | `forte`   | [12, 48, 12] |
 
 **Contagem animada**: 900ms com `easeOutCubic` em `requestAnimationFrame` (nunca
-`setInterval`), disparada por `IntersectionObserver` com `threshold: 0.2`.
+`setInterval` — o intervalo desalinha do quadro e o número treme), disparada por
+`IntersectionObserver` com `threshold: 0.2`. Três detalhes que só aparecem
+depois de escrever:
+
+- **A partida é o que está DESENHADO**, guardado num `ref` atualizado a cada
+  quadro — não o valor anterior da prop. Assim trocar de mês continua de onde o
+  número estava em vez de voltar ao zero e subir de novo.
+- **Uma vez visto, anima na hora.** O observador serve para a primeira vez; se o
+  número já está na tela, esperar de novo faz uma mudança de valor parecer
+  travada.
+- **O número precisa de `tabular-nums`**, senão o bloco inteiro treme enquanto
+  as casas mudam de largura — e o tremor come todo o ganho da animação.
 
 **FLIP para reacomodar**: filhos marcados `data-reacomodar` têm a posição medida
 antes e depois; a inversão é aplicada sem transição e a volta em
@@ -1026,6 +1081,25 @@ no clique. Além disso, alguns **gestos nomeados** por `aria-label` ou
 
 As rotações são pequenas de propósito: 10–12°, não 20. Passou disso vira
 desenho animado.
+
+**Deduza o gesto do rótulo, não do call site.** O componente de botão-só-ícone
+já exige um rótulo acessível; ele é a única coisa que descreve a ação, então é
+dele que o gesto sai:
+
+```ts
+const GESTOS: Array<[RegExp, string]> = [
+  [/apagar|excluir|remover|limpar/i, "apagar"],
+  [/editar|renomear/i, "editar"],
+  [/buscar|procurar|filtrar/i, "buscar"],
+  … // e o botão escreve data-icone={gestoDoRotulo(rotulo)}
+];
+```
+
+Marcar botão por botão parece mais explícito e sempre termina igual: metade dos
+botões marcados, a mesma ação gesticulando de um jeito numa tela e de outro na
+seguinte. Deduzindo, um `data-icone` na mão vira a exceção — para um botão com
+texto **e** ícone (onde `svg:only-child` não pega) ou para um gesto que o
+rótulo não sugere. Uma regra de escape (`icone={null}`) desliga.
 
 ### 7.4 Foco
 
@@ -1220,6 +1294,13 @@ para agrupar, não para gritar. Quem dá a cor é a letra e o ícone.
 `ChipBotao` acrescenta `.pressionavel` e `aria-pressed`. Ativo com cor: fundo
 sólido na cor e letra em `--sobre-emocao`.
 
+**Filtro não herda a cor de categoria.** A cor de categoria diz a natureza de um
+**item**; num filtro ela vira a cor do botão, e uma fileira com dois coloridos e
+dois neutros ("receitas" verde, "despesas" vermelho, ao lado de "tudo" e
+"transferências") lê como quatro coisas de tipos diferentes em vez de quatro
+posições do mesmo controle. Os filtros de uma fileira têm a mesma cara; a cor
+aparece nos itens que a escolha revela.
+
 ### 8.4 Folha (modal)
 
 ```tsx
@@ -1330,6 +1411,32 @@ summary::-webkit-details-marker { display: none; }  /* o triângulo do navegador
 …e o indicador vira um ícone de 16px que gira 180° com `group-open:rotate-180`.
 Deixar o marcador nativo é a única parte do app com um glifo que não é do
 sistema de ícones — e ele muda de desenho a cada navegador.
+
+**A pasta: a tela de ajustes é uma lista de assuntos.** Ajustes com tudo aberto
+tem três telas de altura, e achar um interruptor é rolar procurando. Cada
+assunto é uma sanfona com cara de cartão — ícone, título, subtítulo de uma
+linha dizendo o que tem lá dentro, e a seta:
+
+```
+<details class="group overflow-hidden rounded-[var(--raio-cartao)] border superficie">
+  <summary>  ícone 20px · título txt-sm semibold + subtítulo txt-xs t3 · chevron  </summary>
+  <div class="border-t px-5 py-5">  o conteúdo  </div>
+</details>
+```
+
+Três regras que a fazem funcionar:
+
+- **O conteúdo fica DENTRO do mesmo cartão**, separado por uma linha — não num
+  painel que nasce embaixo. Abrir um assunto não pode empurrar o anterior para
+  fora do lugar dele.
+- **Uma começa aberta**: aquela que a tela existe para resolver. Uma tela de
+  seis cartões fechados não diz o que ela é.
+- **O que não tem volta mora numa pasta moldada em `--perigo`**, sempre a
+  última. A moldura é o aviso; o botão lá dentro não precisa gritar sozinho.
+
+O subtítulo não é decorativo: sem ele a pessoa abre três pastas procurando onde
+fica o tema. Ele lista o conteúdo, não descreve a categoria — "Tema, contraste,
+idioma e moeda", não "Personalize sua experiência".
 
 ### 8.10 Esqueleto
 
@@ -1636,15 +1743,29 @@ aside: sticky top-0 z-40 h-dvh w-64 xl:w-72 shrink-0 border-r px-4 py-6
        hidden lg:flex flex-col
 ```
 
-- Logo no topo (30px), 32px de folga abaixo.
+- **Primeira linha: marca à esquerda, conta à direita.** O canto superior
+  direito da coluna é de quem está usando o app — avatar, ou o botão de uma
+  camada que acompanha a pessoa. 32px de folga abaixo.
 - `<nav className="relative flex flex-col gap-1">` com um `<Trilho>` deslizante
   ao fundo (`superficie-2 rounded-xl`).
 - Item: `relative z-10 flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm
 font-medium`; ativo em `--texto`, inativo em `.t2`. Ícone de 18px,
   `strokeWidth 2`, **acento só no ativo**.
 - Ações principais logo abaixo da lista: a primária larga, a secundária em
-  variante superfície.
+  variante superfície. **Ou** — quando o app já tem uma camada flutuante no
+  canto (agente, ajuda) — a primária vira um botão flutuante empilhado com ela,
+  e a coluna fica só com navegação. Escolha um dos dois e não repita.
 - Versão do app no rodapé, em `.t3 .txt-xs`.
+
+**O `sticky` da coluna morre com `overflow: hidden` no pai.** Um contêiner com
+`overflow-x: hidden` (posto ali para segurar um estouro horizontal) vira um
+contêiner de rolagem, e a coluna passa a grudar **nele** em vez da janela — ele
+não rola, então nada gruda e a navegação sobe junto com a página. Use
+`overflow-x: clip`: ele corta igual e **não** cria contêiner de rolagem.
+
+**Preferência não fica na navegação.** Tema, idioma e contraste moram em
+ajustes. A coluna é para ir a lugares; um interruptor no meio dela é um item de
+menu que não navega, e vira o primeiro lugar onde todo mundo clica por engano.
 
 ### 9.6 Navegação — celular
 
@@ -1694,6 +1815,15 @@ está na coluna).
 
 O rótulo pode ser dinâmico e dar o estado ("47 entradas até aqui"). O título é
 sempre curto e em caixa baixa.
+
+**Filtro não é ação de cabeçalho.** Passo de mês, popover de categoria e
+segmentado vão para a **primeira faixa do conteúdo**, junto da busca — nunca
+para o `actions`. Dentro do cabeçalho eles quebram para uma segunda linha no
+celular, e a distância entre o título e o conteúdo passa a mudar de tela para
+tela: é a origem mais comum do "cada tela tem um espaçamento diferente". A
+prova é mecânica — meça `header.getBoundingClientRect().bottom` em todas as
+rotas na largura de celular; se um número destoa, é uma ação a mais lá dentro.
+Ação secundária de verdade (sincronizar, importar, exportar) pode ficar.
 
 ### 9.8 Progresso de rota
 
@@ -2101,7 +2231,16 @@ Antes de dar uma tela por pronta:
 - [ ] Cartão de valor: um por linha no celular, e o mesmo degrau de número em
       todos os cartões da tela.
 - [ ] Escolha (campo, dropdown, aba, filtro, passo de mês) usa o raio de campo;
-      a pílula é de chip, badge, botão de ícone e navegação.
+      a pílula é de chip, badge, botão de ícone, navegação e segmentado.
+- [ ] Filtro tem a casca do vizinho da linha — mesma superfície e mesma moldura
+      do campo de busca, não só o mesmo raio.
+- [ ] Nenhum filtro dentro do `actions` do cabeçalho: meça
+      `header.getBoundingClientRect().bottom` em todas as rotas na largura de
+      celular e confira que o número é o mesmo.
+- [ ] Filtro de tipo não usa cor de categoria — os da fileira têm a mesma cara.
+- [ ] `scrollbar-gutter: stable` no `html`: `clientWidth` é o mesmo numa tela
+      curta e numa longa.
+- [ ] Nenhum ancestral da coluna `sticky` com `overflow: hidden` (use `clip`).
 - [ ] Linha de lista: uma coisa por coluna, ladrilho sempre presente, estado em
       palavra e não em pílula ao lado do valor.
 - [ ] Todo controle é um componente do sistema, não uma `<div>` estilizada.
@@ -2125,6 +2264,9 @@ Antes de dar uma tela por pronta:
 - [ ] Estado vazio usa o componente — inclusive o "nada encontrado" do filtro,
       que é o que mais escapa (a mesma tela costuma ter dois).
 - [ ] Nenhum bloco de classes repetido três vezes (ver §8.0).
+- [ ] O gesto do ícone sai do rótulo, não de uma marcação por call site.
+- [ ] A versão que a interface mostra é a mesma do `package.json`, e o build
+      cobra isso.
 - [ ] Os DOIS vazios da tela existem e usam o componente (§10.7).
 - [ ] Carregamento tem o formato do conteúdo; a roda girando é a terceira opção.
 - [ ] Todo caminho de saída respeita o que a interface diz estar protegido
