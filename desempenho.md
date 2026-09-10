@@ -838,13 +838,33 @@ decidido nada. Quem perdeu a sessão no meio-tempo — saiu da conta noutra aba,
 num computador emprestado — voltaria a ver o app. Então o cliente confere:
 
 ```tsx
-// Em rota que exige conta, e SÓ com rede.
-if (navigator.onLine === false) return; // offline não dá para concluir nada
-const { data } = await cliente.auth.getSession();
-if (!data.session) window.location.replace(`/entrar?proxima=${caminho}`);
+// Em rota que exige conta. Ouça o sinal ASSENTADO — não pergunte no meio.
+cliente.auth.onAuthStateChange((evento, sessao) => {
+  if (sessao) return;
+  if (evento === "SIGNED_OUT")
+    sair(); // acabou de verdade, sem ambiguidade
+  else if (evento === "INITIAL_SESSION") void confirmarEsair(); // pede segunda opinião
+});
 ```
 
-Dois detalhes que custam caro se forem esquecidos:
+**O erro que essa guarda quase sempre comete na primeira versão, e que é caro
+porque aparece em TODA abertura:** decidir a partir de um `getSession()` solto
+na montagem. `getSession()` responde `null` durante a janela em que o cliente
+ainda está renovando um token vencido — e essa janela vira o caso comum
+justamente quando você aplica §4.6, porque o token deixa de chegar fresco do
+middleware e passa a ser renovado no cliente, pela rede, em quase um segundo.
+
+O resultado é um piscar caríssimo: o app abre, vai para a tela de entrar, o
+servidor vê a sessão boa e manda de volta — em quem estava perfeitamente
+logado. `onAuthStateChange` emite `INITIAL_SESSION` **depois** que o cliente
+terminou de recuperar (ou de não recuperar) a sessão; é esse o sinal.
+
+E vale pedir uma segunda opinião antes de expulsar por `INITIAL_SESSION`: um
+`getSession()` um segundo depois. O custo de um falso positivo aqui é alto e
+visível; o de esperar um segundo é zero, porque a casca certa já está desenhada
+e ninguém está olhando para a tela errada.
+
+Mais dois detalhes que custam caro se forem esquecidos:
 
 - **Vá direto para a tela de entrar, não para o mesmo endereço.** Recarregar o
   caminho atual pareceria mais limpo — a portaria decidiria de novo — mas o
@@ -863,6 +883,68 @@ Dois detalhes que custam caro se forem esquecidos:
 funcionando (1), e `loadEventEnd` contra o começo do pré-cache mostra (3). No
 app instalado, o cronômetro honesto é o mais simples que existe: filme a tela e
 conte os quadros de logo.
+
+### 8.5 A versão nova: aplicar na porta, nunca no meio do uso
+
+Um app com service worker tem um problema que um site normal não tem: **quem
+está no comando é o worker antigo, e ele não sai de cena sozinho.** Publicar não
+atualiza ninguém — instala uma versão nova que fica _esperando_.
+
+A recomendação padrão é avisar e deixar a pessoa decidir, e ela existe por um
+bom motivo: trocar o JavaScript por baixo de uma gravação em curso perde
+contexto sem ninguém entender o porquê. O problema é o outro extremo — quem
+ignora o aviso fica semanas numa versão velha, e a correção que você publicou
+não chega em quem mais precisava dela.
+
+A regra que resolve os dois lados: **aplica na porta, nunca no meio do uso.**
+
+| Quando a versão nova aparece                                                   | O que fazer           |
+| ------------------------------------------------------------------------------ | --------------------- |
+| Já estava esperando quando o app ABRIU                                         | assume, sem perguntar |
+| Terminou de instalar nos primeiros ~10s, sem ninguém ter tocado em nada        | assume também         |
+| Apareceu com o app já em uso                                                   | convida               |
+| Tela onde há conteúdo em curso (escrever, conversar, alvo de compartilhamento) | convida, sempre       |
+
+O pior caso passa a ser **uma abertura atrás**, nunca mais que isso: o que foi
+convite hoje está esperando amanhã, e a primeira linha da tabela o aplica.
+
+**Isto não custa desempenho, e o detalhe é qual chamada você usa.**
+`getRegistration()` só consulta o que este navegador já sabe — não é ida ao
+servidor —, então pode rodar nos primeiros milissegundos da abertura sem
+disputar nada. O `register()` e o pré-cache continuam no ocioso (§8.1).
+
+```ts
+// Na porta: local, imediato, sem rede.
+if (telaComConteudoEmCurso(location.pathname)) return;
+if (sessionStorage.getItem(CHAVE_JA_ASSUMIU)) return; // uma vez por aba
+const registro = await navigator.serviceWorker.getRegistration();
+if (!registro?.waiting || !navigator.serviceWorker.controller) return;
+sessionStorage.setItem(CHAVE_JA_ASSUMIU, "1");
+registro.waiting.postMessage("assumir-agora"); // o worker chama skipWaiting()
+// `controllerchange` recarrega uma vez.
+```
+
+Quatro guardas, e cada uma cobre um jeito de isto dar errado:
+
+- **`controller` tem de existir.** Sem ele não é atualização, é a primeira
+  instalação — e recarregar a primeira visita de alguém é gratuito e grosseiro.
+- **Uma vez por aba** (`sessionStorage`). Se a ativação falhar e o worker
+  continuar esperando, sem essa marca o app recarrega em laço. Armazenamento
+  bloqueado (aba anônima) conta como "já tentou": melhor perder a troca do que
+  arriscar o laço.
+- **"Ainda na porta" é sem TOQUE, não só sem tempo.** Um relógio sozinho
+  recarrega em cima de quem abriu o app e começou a ler nos primeiros segundos.
+  Marque o primeiro `pointerdown` / `keydown` / `wheel` / `touchstart` com um
+  ouvinte `once` e pare de assumir a partir dali.
+- **As telas de conteúdo em curso ficam fora, sempre** — inclusive na porta. O
+  alvo de compartilhamento abre JÁ com um arquivo que outro app mandou;
+  recarregar ali perde exatamente aquilo.
+
+**E lembre do custo do outro lado.** Se a sua versão de cache é apagada ao
+ativar (e deve ser — HTML velho apontando para chunks velhos é o pior dos
+mundos), a abertura logo depois da troca vai à rede. É uma abertura lenta por
+publicação, contra a garantia de que ninguém fica para trás. Vale; só não
+confunda essa abertura com a otimização de §8.4 tendo falhado.
 
 ---
 
@@ -1239,6 +1321,12 @@ Antes de dar uma tela por pronta:
 - [ ] Quando o HTML pode vir do cache ou do bfcache, existe uma guarda de sessão
       no cliente — e ela não expulsa ninguém offline, nem recarrega o mesmo
       endereço (laço).
+- [ ] A guarda de sessão decide pelo sinal ASSENTADO (`INITIAL_SESSION` /
+      `SIGNED_OUT`), nunca por um `getSession()` solto na montagem — que
+      responde `null` enquanto um token vencido está sendo renovado.
+- [ ] A versão nova do worker é aplicada na PORTA (esperando na abertura, ou
+      instalada antes do primeiro toque) e convidada no meio do uso — ninguém
+      fica mais de uma abertura atrás.
 - [ ] Só as famílias e os pesos de fonte que a interface desenha de fato, e no
       `preload` só as que estão no primeiro quadro.
 - [ ] Dois componentes dinâmicos que usam a mesma biblioteca pesada moram no
