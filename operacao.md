@@ -679,6 +679,12 @@ origem, e trocar de domínio depois é pedir para todo mundo reinstalar.
   grande, `+1.0.0` para o que muda o núcleo do app.
 - **Mostre a versão no app** (rodapé dos ajustes, ou da barra lateral). É o que
   transforma "está esquisito aqui" em um relato utilizável.
+- **Uma fonte da verdade, cobrada no build.** A versão que a interface mostra sai
+  de uma constante do código, e um script de dez linhas no `npm run build`
+  compara essa constante com o `package.json` e reprova se divergirem. Sem a
+  trava, os dois andam separados na primeira entrega apressada — e como a versão
+  está na tela, a divergência não é um detalhe interno: é o relato de bug vindo
+  com o número errado.
 - **Suba a versão do service worker** junto, quando algo pré-cacheado mudar.
 - O histórico do git é o changelog. Mensagem de commit no imperativo, dizendo o
   efeito e não o arquivo tocado.
