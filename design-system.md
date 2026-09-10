@@ -86,8 +86,7 @@ classes:
 
 ```js
 var escuro =
-  salvo === "escuro" ||
-  (salvo === "sistema" && matchMedia("(prefers-color-scheme: dark)").matches);
+  salvo === "escuro" || (salvo === "sistema" && matchMedia("(prefers-color-scheme: dark)").matches);
 raiz.classList.toggle("dark", escuro);
 raiz.style.colorScheme = escuro ? "dark" : "light";
 raiz.classList.toggle("contraste-alto", contraste === "alto");
@@ -221,10 +220,8 @@ vista e é o que dá ar de template genérico.
   --texto-3: #6b645b;
 
   --sombra-baixa: 0 1px 2px rgb(22 19 15 / 0.04);
-  --sombra:
-    0 1px 2px rgb(22 19 15 / 0.04), 0 4px 16px -6px rgb(22 19 15 / 0.08);
-  --sombra-alta:
-    0 2px 4px rgb(22 19 15 / 0.05), 0 12px 32px -8px rgb(22 19 15 / 0.16);
+  --sombra: 0 1px 2px rgb(22 19 15 / 0.04), 0 4px 16px -6px rgb(22 19 15 / 0.08);
+  --sombra-alta: 0 2px 4px rgb(22 19 15 / 0.05), 0 12px 32px -8px rgb(22 19 15 / 0.16);
 
   --perigo: #f43a2b;
   --perigo-tenue: rgb(244 58 43 / 0.1);
@@ -862,8 +859,7 @@ O que o CSS não alcança passa por um guarda único:
 ```ts
 export function querMenosMovimento() {
   return (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   );
 }
 ```
@@ -1102,30 +1098,19 @@ que não davam sinal nenhum de que eram.
 
 ```css
 @media (prefers-reduced-motion: no-preference) {
-  :is(
-    button,
-    [role="button"],
-    summary,
-    label[for],
-    a[href],
-    .pressionavel,
-    .interativo
-  ):not(:disabled, [aria-disabled="true"]) {
+  :is(button, [role="button"], summary, label[for], a[href], .pressionavel, .interativo):not(
+    :disabled,
+    [aria-disabled="true"]
+  ) {
     transition-property:
-      transform, opacity, background-color, background-image, color,
-      border-color, box-shadow;
+      transform, opacity, background-color, background-image, color, border-color, box-shadow;
   }
 
   @media (hover: hover) {
-    :is(
-        button,
-        [role="button"],
-        summary,
-        label[for],
-        a[href],
-        .pressionavel,
-        .interativo
-      ):not(:disabled, [aria-disabled="true"]):hover {
+    :is(button, [role="button"], summary, label[for], a[href], .pressionavel, .interativo):not(
+        :disabled,
+        [aria-disabled="true"]
+      ):hover {
       background-image: linear-gradient(var(--veu-hover), var(--veu-hover));
     }
   }
