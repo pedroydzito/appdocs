@@ -424,6 +424,58 @@ isso acontece dentro de uma transição (a ação do servidor, o `refresh` do
 roteador), e transição não revela fallback: a tela anterior fica no lugar. Se
 você vir o esqueleto piscar a cada escrita, o que faltou foi a transição.
 
+### 4.12 A lista não traz o que só a tela de um item abre
+
+Coluna pesada que só a tela de detalhe mostra — o histórico de versões, a
+transcrição crua, um vetor de busca — **não entra na leitura de lista**. Numa
+lista de centenas de itens, é ela que faz a abertura baixar megabytes; e em
+banco hospedado o recurso que acaba primeiro no plano grátis é o **tráfego de
+saída**, não o disco. Um vetor de embedding sozinho já foi medido como 86% do
+tráfego da tela inicial.
+
+- **Declare as colunas pesadas numa lista só** (`COLUNAS_PESADAS`) e monte o
+  `select` da lista sem elas. A tela do item pede a linha inteira.
+- **Função de banco que devolve `setof tabela` devolve TODA coluna.** Chame-a
+  com `select` explícito — sem isso, o vetor volta junto em toda busca.
+- **O espelho local preserva o que a leitura enxuta não trouxe.** Sem isso, a
+  lista grava por cima do item uma versão sem histórico, e a tela de versões
+  abre vazia offline. Marque a cópia como `parcial`: é o que faz a
+  sincronização saber que precisa buscar a linha inteira mesmo com o carimbo
+  batendo.
+- **Revalidar é perguntar o índice, não baixar tudo.** Primeiro
+  `id, atualizado_em, excluido_em` — dezenas de bytes por item —, depois só as
+  linhas cujo carimbo não bate com o do espelho. Numa abertura comum isso é
+  zero ou um item. Quem dá certeza ao carimbo é um gatilho no banco
+  (`before update … set atualizado_em = now()`), não o cliente.
+
+### 4.13 A resposta atrasada não apaga o que a tela já mostrou
+
+No 4G a ordem das respostas não é a ordem dos pedidos. Um trabalho em segundo
+plano grava o resultado (um resumo, um título), a tela pinta — e uma leitura
+de lista que **saiu antes** desse update volta depois com a linha antiga. Sem
+cuidado, o espelho e o cache apagam o que a pessoa acabou de ler, e a tela,
+vendo o campo vazio, **dispara o trabalho de novo**.
+
+```ts
+function preservarLocal(servidor: Item, local: Item | undefined): Item {
+  if (!local) return servidor;
+  const localTem = Boolean(local.resultado?.length);
+  const servidorTem = Boolean(servidor.resultado?.length);
+  if (localTem && !servidorTem) {
+    return { ...servidor, ...camposDoResultado(local), pendente: false };
+  }
+  if (localTem && !local.pendente && servidor.pendente) {
+    return { ...servidor, pendente: false };
+  }
+  return servidor;
+}
+```
+
+Aplique na lista **e** na leitura de um item, antes de gravar no cache e no
+espelho. É a mesma família de §4.9 (respostas fora de ordem), mas o sintoma é
+pior: não é uma tela desatualizada por um instante, é trabalho pago feito duas
+vezes.
+
 ## 5. Listas longas
 
 ### 5.1 Virtualizar
@@ -517,6 +569,34 @@ sem transição e devolva ao normal em uma transição de `transform`. Animar
 `width`/`top` recalcula layout a cada quadro; `transform` não.
 
 ---
+
+### 6.6 Animação que termina não pode deixar camada
+
+`animation-fill-mode: both` mantém o **último quadro** aplicado para sempre. Se
+esse quadro tem `transform` (mesmo `transform: none` dentro do `@keyframes`), o
+elemento vira uma camada de composição permanente. No celular, o dedo que
+pousa nessa camada tenta rolá-la — e ela não é um contêiner de rolagem, então
+**a página não anda**. O sintoma é "a tela travou de rolar", só no celular, e
+só depois da animação de entrada.
+
+Entrada é `backwards`: pinta o primeiro quadro durante o atraso e **solta
+tudo** no fim. `both` fica para o que precisa guardar o estado final (e para
+animação ligada à rolagem). Ver design system §6.6.
+
+### 6.7 Estado inicial preguiçoso, não efeito
+
+Valor que o cliente sabe ler na hora (preferência guardada, espelho local
+síncrono) entra pelo **inicializador** do estado, e não por um efeito que
+chama `setState` depois de montar:
+
+```ts
+const [locais, setLocais] = useState<string[]>(lerLocais); // e não useEffect(() => setLocais(lerLocais()))
+```
+
+O efeito custa um render a mais em toda montagem, e o linter o conta como
+aviso. O cuidado é a hidratação: `lerLocais` precisa devolver no servidor o
+mesmo que o primeiro quadro do cliente mostra — o que decide o que aparece é
+uma bandeira `pronto` que nasce falsa dos dois lados.
 
 ## 7. Adiar, esperar e cancelar
 
@@ -676,6 +756,54 @@ As outras coisas que desligam o bfcache, e que vale conferir junto:
 - uma conexão aberta que o navegador não sabe pausar (`WebSocket`, `EventSource`)
   — feche-a em `pagehide` e reabra em `pageshow`;
 - `window.opener` vivo.
+
+### 7.8 Trabalho em segundo plano: um de cada vez, e a barra só com trabalho de verdade
+
+Resumir, analisar, indexar — o que roda depois de salvar — tem três defeitos
+clássicos, e os três aparecem juntos no 4G:
+
+1. **Duas idas ao modelo pelo mesmo item.** A tela dispara ao abrir, a
+   sincronização dispara ao voltar a rede, a pessoa aperta "gerar de novo".
+2. **Barra de progresso mentindo.** A barra acende por uma bandeira guardada
+   (`pendente`), não por um trabalho em curso — e gira para sempre depois que
+   o trabalho morreu com a aba.
+3. **Voltar à tela recomeça a barra do 0%**, porque o componente remontou.
+
+O registro que resolve os três vive **no módulo**, não no componente:
+
+```ts
+const emCurso = new Set<string>();
+const inicio = new Map<string, number>(); // quando a barra acendeu
+const geracao = new Map<string, number>(); // quem pediu por último
+const falhas = new Set<string>(); // duas tentativas falharam
+const ouvintes = new Set<() => void>();
+
+export function useEmCurso(id: string) {
+  return useSyncExternalStore(
+    inscrever,
+    () => emCurso.has(id),
+    () => false,
+  );
+}
+```
+
+- **Decida antes de começar**, numa função pura e testada: já em curso → não;
+  já tem resultado e ninguém pediu de novo → só limpa a bandeira; sem rede →
+  **não acende nada** e deixa a bandeira para a sincronização; senão, começa.
+- **Geração**: cada pedido explícito ("gerar de novo") incrementa a geração do
+  item. O trabalho antigo confere `aindaVale()` antes de cada escrita e sai em
+  silêncio se perdeu a vez — é o que impede o resultado velho de gravar por
+  cima do novo.
+- **A barra acende só com `emCurso`**, e nasce onde o tempo já a teria levado:
+  guarde o instante em que o trabalho começou e estime o progresso a partir
+  dele (`estimarProgresso(valor, passo, inicio, agora)`). Voltar à tela não
+  zera; o mesmo trabalho nunca recua.
+- **Duas tentativas, e para.** A terceira espera era a barra fingindo. Falhou
+  duas vezes: desliga a bandeira, marca `falhas`, e a tela troca a barra por
+  um botão de "tentar de novo". Recusa de plano não é falha de rede — não
+  repete.
+- Com o resultado na tela, uma bandeira `pendente` que ficou ligada (a lista
+  atrasada de §4.13) **só se limpa** — não dispara nada.
 
 ## 8. Offline-first
 
@@ -1007,6 +1135,31 @@ resolvido — um teste que passaria dos dois jeitos não protege nada.
 
 ---
 
+### 8.7 O worker não pode falhar ao se instalar
+
+`event.waitUntil(p)` rejeitado no `install` ou no `activate` faz o navegador
+**descartar** o worker novo. A página fica sem controlador — e o estado gruda:
+toda abertura reinstala o mesmo worker, que falha na mesma linha. Só "limpar
+os dados do site" resolve, até a próxima atualização passar pelo mesmo
+caminho.
+
+O caso real: o `activate` consolidava uma caixa de arquivos recebidos gravada
+por **outra versão** do worker, e um item fora do formato esperado estourava
+ali. Sem controlador, o alvo de compartilhamento (um `POST` que só o worker
+intercepta) caía no servidor, que não sabe o que fazer com ele.
+
+- **Cada etapa do `install` e do `activate` tem o seu `try`.** Nenhuma delas
+  rejeita a promessa do `waitUntil`; o pior caso é uma etapa pulada, não o
+  worker inteiro.
+- **Dado de outra versão é entrada não confiável.** Valide o formato antes de
+  mexer; descarte o que não reconhecer.
+- **Nunca guarde resposta com `redirected: true`.** Sem sessão, o servidor
+  desvia para o login e o `fetch` do pré-cache segue o desvio — e guarda o HTML
+  do login debaixo da chave da rota. O navegador recusa resposta desviada numa
+  navegação, e mostra `ERR_FAILED` sem uma palavra sobre service worker.
+- **Deixe a medição passar direto** (`/_vercel/`, ou o caminho do seu RUM):
+  medição servida do cache mede a versão de ontem.
+
 ## 9. Imagens
 
 ### 9.1 Comprima no cliente, antes de subir
@@ -1124,6 +1277,28 @@ Duas formas corretas, dependendo do caso:
   (`requestAnimationFrame`), para o novo `src` já ter sido pintado.
 
 ---
+
+### 9.5 Avatares: a lista não espera pela foto
+
+Uma lista de pessoas (ou de qualquer coisa com miniatura) tem três esperas
+somadas, e cada uma sozinha custa um segundo:
+
+1. **A lista esperava pelas fotos.** Um `await preCarregarFotos()` antes de
+   devolver a lista deixava a tela inteira no esqueleto até o armazenamento
+   assinar **todos** os avatares. Quem pede a URL é cada `<Avatar>`, e os
+   pedidos do **mesmo quadro** se juntam num lote só (uma fila que esvazia em
+   `queueMicrotask`/`requestAnimationFrame`). Mesma requisição — depois da
+   primeira pintura, e não antes.
+2. **O arquivo do aparelho vem primeiro**, com ou sem rede. A foto guardada na
+   visita anterior é lida do banco local; só o que falta vai à rede. As
+   leituras locais são paralelas.
+3. **O worker não reconsulta o avatar.** O caminho carrega o instante do
+   envio (`avatares/<id>/<timestamp>.webp`), então trocar a foto cria um
+   caminho **novo** — o antigo nunca muda, e pode ser servido do cache sem
+   perguntar. "O avatar muda" é verdade para a pessoa, não para o arquivo.
+
+E enquanto a foto não chega, a **inicial** ocupa o lugar dela (design system
+§8.20) — a lista nasce com os nomes.
 
 ## 10. Web Workers
 
@@ -1275,7 +1450,21 @@ banco é onde o N+1 nasce.
 
 ## 13. Observabilidade
 
-- **RUM em produção** para LCP/INP/CLS por rota.
+- **RUM em produção** para LCP/INP/CLS por rota. Na Vercel é o Web
+  Analytics + Speed Insights (`@vercel/analytics`), no casco do app **e** nas
+  páginas públicas (as que o buscador indexa e as únicas que alguém abre sem
+  conta). O script vem do próprio domínio (`/_vercel/…`), então a CSP não
+  muda; o worker deixa esse caminho ir direto para a rede.
+- **A nota que mais cai é CLS, e a causa é quase sempre a mesma**: um anel
+  girando no lugar do conteúdo. O anel não tem as medidas do que vem depois,
+  e a tela inteira se reorganiza quando os dados chegam. O conserto é o
+  esqueleto **com a forma da tela** — a linha de busca, a grade nas medidas
+  reais, o cabeçalho, a foto. Um bloco de 160px com um anel no meio não é
+  esqueleto.
+- **Nada nasce e some acima do conteúdo.** Um aviso que aparece no topo, faz
+  a própria consulta e desaparece quando ela responde empurra a grade para
+  baixo e depois para cima. A consulta dele vai para a tela, **junto** da
+  consulta da lista, e ele só é desenhado quando as duas responderam.
 - **Log estruturado** em JSON, com uma lista de campos proibidos (conteúdo do
   usuário, token, e-mail). Log que vaza conteúdo é incidente, não observabilidade.
 - **Relato de erro do cliente** para o servidor, com `keepalive: true` (o
@@ -1342,6 +1531,26 @@ toque (o gesto nativo do celular já é bom, e roubá-lo custa quadros). Marque 
   antes da fatura.
 - Um modo degradado quando não há chave configurada — o app continua de pé, só
   com menos recurso.
+- **Vazio não é silêncio.** O modelo corta a geração **sem texto e sem erro**
+  por travas próprias (`finishReason`: `RECITATION` quando a saída lembra um
+  texto conhecido, `LANGUAGE` quando o idioma não é o esperado, e os de
+  conteúdo). Um áudio que troca de língua no meio é o caso típico. Três
+  respostas, na ordem:
+  1. **Registre o motivo** no log sempre que vier vazio sem o modelo ter dito
+     "não há fala" — senão a próxima vez é palpite.
+  2. **Tente de novo no servidor, uma vez, com temperatura mais alta** — é a
+     orientação do próprio fornecedor para recitação.
+  3. **Devolva `bloqueado`** e deixe o cliente refazer em **pedaços curtos**
+     (30s em vez de 120s): a trava pega um trecho, e em pedaço menor ela
+     derruba o trecho, não o áudio inteiro.
+- **Distinga "não há fala" de "voltou vazio".** Peça ao modelo uma resposta
+  fixa para silêncio (`SEM_FALA`) e reconheça-a (mais as variantes em que ele
+  descreve o silêncio). Silêncio declarado **não** é refeito — a cota é
+  dinheiro.
+- **Áudio curto que volta vazio também é refeito.** A heurística "texto curto
+  demais para o tempo do áudio" só funciona em áudio longo; sem uma regra
+  própria para o vazio, um áudio de um minuto que o modelo travou vira "não
+  consegui ler" direto.
 
 ---
 
@@ -1403,6 +1612,25 @@ Antes de dar uma tela por pronta:
       prévia local só é revogada quando a definitiva já está na tela.
 - [ ] Depois de todo `await` que devolve um recurso do aparelho, há a pergunta
       "a tela ainda existe?" — e a devolução do recurso se ela não existir.
+- [ ] Coluna que só a tela do item abre (histórico, texto cru, vetor) fica fora
+      da leitura de lista, e o espelho preserva o que a leitura enxuta não
+      trouxe (§4.12).
+- [ ] Função de banco `setof tabela` é chamada com `select` explícito.
+- [ ] Leitura atrasada não apaga resultado que a tela já mostrou (§4.13).
+- [ ] Trabalho em segundo plano: um por item, com geração; a barra acende só
+      com trabalho em curso, continua de onde estava, e duas falhas viram botão
+      (§7.8).
+- [ ] Nenhuma animação de entrada deixa o último quadro aplicado (§6.6).
+- [ ] Valor que o cliente lê na hora entra pelo inicializador do estado, não
+      por efeito (§6.7).
+- [ ] `install` e `activate` do worker nunca rejeitam; resposta com
+      `redirected` nunca vai para o cache (§8.7).
+- [ ] Lista com miniatura não espera pela foto: assinatura em lote por quadro,
+      arquivo local primeiro, caminho imutável no cache (§9.5).
+- [ ] RUM ligado no app e nas páginas públicas; carregamento tem esqueleto com
+      a forma da tela, e nada nasce e some acima do conteúdo (§13).
+- [ ] Chamada de IA que volta vazia registra o `finishReason`, tenta de novo, e
+      não é confundida com "não há nada" (§14.6).
 
 ---
 

@@ -374,6 +374,54 @@ Duas regras aprendidas a duras penas:
   e noutra na edição. O tom vivo ficou, com o piso de 3:1 que o teste cobra.
 - **A cor nunca é o único sinal.** O nome está sempre escrito ao lado.
 
+### 3.4-b Cor derivada de uma chave
+
+Quando cada item de uma série precisa de uma cor **própria e estável** — cada
+ano de uma retrospectiva, cada coleção, cada projeto —, a cor não é sorteada
+nem guardada: ela **sai da própria chave**.
+
+```ts
+const PALETA = [
+  { nome: "coral", acento: "#FF7A66", solido: "#C23A22" },
+  { nome: "âmbar", acento: "#FFB944", solido: "#A66206" },
+  { nome: "lima", acento: "#BEE84F", solido: "#5E7A12" },
+  { nome: "verde", acento: "#5FD98A", solido: "#1E7A45" },
+  { nome: "turquesa", acento: "#3FD8CE", solido: "#0C6F6A" },
+  { nome: "azul", acento: "#6FB1FF", solido: "#1D5FC4" },
+  { nome: "violeta", acento: "#B79CFF", solido: "#6A3FD1" },
+  { nome: "rosa", acento: "#FF85BE", solido: "#BE2E73" },
+];
+
+export function corDaChave(chave: number) {
+  if (!Number.isFinite(chave)) return PALETA[0];
+  return PALETA[(Math.abs(Math.trunc(chave)) * 3) % PALETA.length];
+}
+```
+
+- **Determinística.** Duas pessoas que abrem o mesmo item veem a mesma cor, em
+  qualquer aparelho, sem nada guardado. Sorteio de verdade daria uma tela
+  diferente a cada abertura, e ninguém conseguiria dizer "o meu é o verde".
+- **Passo coprimo com o tamanho da paleta** (3 sobre 8). A volta passa pelas
+  oito antes de repetir e, o que importa mais, **chaves vizinhas nunca caem em
+  cores vizinhas**. `chave % 8` também daria oito cores, mas em sequência — e a
+  paleta ficaria previsível de ver.
+- **Dois tons por cor, cada um com seu papel.** `acento` é o vivo, para traço,
+  texto e gráfico sobre fundo escuro — todos passam de 4,5:1 contra `#0a0908`.
+  `solido` é o mesmo matiz rebaixado, para **preenchimento com texto branco**
+  (cartão, botão) — todos passam de 4,5:1 com branco. Um tom só não serve aos
+  dois: branco sobre o lima vivo dá 1,3:1.
+- **O teste cobra os dois lados** para as oito cores, e cobra também que
+  chaves vizinhas nunca repitam cor.
+- **Aplicar trocando o acento, não cada componente.** Dentro da área que usa a
+  cor da chave, redefina `--color-acento-500`, `--acento-texto` e
+  `--acento-solido` num `style` do invólucro. Tudo lá dentro que pede "o
+  acento" passa a pedir a cor da chave, sem uma linha a mais em nenhum
+  componente. Fora dele, o acento do app continua o de sempre.
+- **Onde essa cor aparece fora da área**, ela vem pelo `solido`: um cartão que
+  abre a área usa o preenchimento da cor dela, com texto branco a 100% — sem
+  opacidade, que derrubaria o contraste (branco a 80% sobre o verde-escuro dá
+  3,7:1).
+
 ### 3.5 O véu de hover
 
 Um padrão para o app inteiro. Antes cada componente inventava o seu: o primário
@@ -798,11 +846,34 @@ sem JavaScript, e só onde o navegador suporta:
     .cabecalho-encolhe {
       animation: encolher-cabecalho linear both;
       animation-timeline: scroll();
-      animation-range: 0 220px; /* detalhe da entrada usa 0 180px */
+      animation-range: 0 220px; /* a tela de detalhe usa 0 180px */
+      transform-origin: left top;
     }
   }
 }
+
+@keyframes encolher-cabecalho {
+  to {
+    transform: scale(0.72);
+    opacity: 0.55;
+  }
+}
 ```
+
+Quatro detalhes que fazem ele ser **o mesmo** em qualquer app:
+
+- **72% e 55%**, em **220px** de rolagem. Menos que isso o gesto não se nota;
+  mais, e o título some antes de a pessoa terminar de ler a primeira linha da
+  lista.
+- **Sem JavaScript.** `animation-timeline: scroll()` liga a animação à
+  rolagem do documento; não há listener, estado nem quadro de JS. Onde a
+  propriedade não existe (`@supports`), o título fica do tamanho normal — que
+  é o estado inicial, então nada quebra.
+- **Aqui `both` é obrigatório** — é a exceção da regra de §6.6: numa animação
+  ligada à rolagem, o "estado final" é a posição da página, e sem `forwards` o
+  título voltaria ao tamanho cheio assim que a rolagem passasse de 220px.
+- **Vai no rótulo e no título, um por um** (ver §9.7), nunca no cabeçalho
+  inteiro nem no que vem abaixo dele.
 
 **View Transitions.** Três usos, todos com queda limpa quando a API não existe:
 
@@ -946,9 +1017,18 @@ o app noutro projeto copia daqui — não precisa adivinhar duração, curva nem
 
 Três convenções valem para todas:
 
-- **`both` / `backwards` quase sempre.** Sem `backwards`, o elemento pisca no
-  estado final por um quadro antes de a animação começar — o defeito é sutil e
-  aparece justo nas listas encadeadas, onde há atraso.
+- **Entrada é `backwards`, e não `both`.** Sem `backwards`, o elemento pisca
+  no estado final por um quadro antes de a animação começar — o defeito é sutil
+  e aparece justo nas listas encadeadas, onde há atraso. Mas `both` também
+  carrega o `forwards`, e aí o **último quadro fica aplicado para sempre**: um
+  `transform: none` (ou qualquer `transform`) que nunca sai promove o elemento
+  a uma camada de composição permanente. No celular, o dedo que pousa nessa
+  camada tenta rolá-la — e ela não é um contêiner de rolagem, então **a página
+  simplesmente não anda**. Aconteceu com a tela inteira (`.animar-tela`), com a
+  folha e com o painel de aba: rolar travava até recarregar. A regra: se o
+  quadro final é igual ao estilo natural do elemento (o caso de toda entrada),
+  use `backwards`. `both` só onde o estado final **precisa** ficar (uma barra
+  que cresce até a altura do dado e não tem essa altura no CSS).
 - **Entrada usa `var(--curva)`; saída usa `var(--curva-saida)`.** Quando a
   duração é escrita em segundos (`0.4s`) e não em milissegundos, é código
   antigo: o valor está certo, a unidade é que não foi normalizada.
@@ -964,14 +1044,14 @@ Três convenções valem para todas:
 | `surgirBaixo`           | `from` opacity: 0; transform: translateY(10px) scale(0.95) → `to` opacity: 1; transform: translateY(0) scale(1)                   | `.animar-surgir-baixo` — `surgirBaixo 0.2s cubic-bezier(0.16, 1, 0.3, 1) backwards`                                                                                                                                                                                                                                                                         |
 | `surgir-baixo`          | `from` opacity: 0; transform: translateY(100%) → `to` opacity: 1; transform: none                                                 | chamado inline / por JS                                                                                                                                                                                                                                                                                                                                     |
 | `revelar`               | `from` opacity: 0; transform: translateY(10px) → `to` opacity: 1; transform: none                                                 | `.revela-ao-rolar` — `revelar 340ms cubic-bezier(0.16, 1, 0.3, 1) both`                                                                                                                                                                                                                                                                                     |
-| `entrar-tela`           | `from` opacity: 0; transform: translateY(8px) → `to` opacity: 1; transform: none                                                  | `.animar-tela` — `entrar-tela 180ms var(--curva) both` <br> `.animar-tela-voltando` — `entrar-tela-voltando 200ms var(--curva) both` <br> `.entra-escalonado` — `entrar-tela 300ms cubic-bezier(0.16, 1, 0.3, 1) both` <br> `.entra-cascata` — `entrar-tela 400ms cubic-bezier(0.16, 1, 0.3, 1) both`                                                       |
+| `entrar-tela`           | `from` opacity: 0; transform: translateY(8px) → `to` opacity: 1; transform: none                                                  | `.animar-tela` — `entrar-tela 180ms var(--curva) backwards` <br> `.animar-tela-voltando` — `entrar-tela-voltando 200ms var(--curva) backwards` <br> `.entra-escalonado` — `entrar-tela 300ms cubic-bezier(0.16, 1, 0.3, 1) backwards` <br> `.entra-cascata` — `entrar-tela 400ms cubic-bezier(0.16, 1, 0.3, 1) backwards`                                   |
 | `entrar-tela-voltando`  | `from` opacity: 0; transform: translateX(-14px) → `to` opacity: 1; transform: none                                                | chamado inline / por JS                                                                                                                                                                                                                                                                                                                                     |
 | `entrar-encadeado`      | `from` opacity: 0; transform: translateY(10px) → `to` opacity: 1; transform: none                                                 | `.animar-tela [data-encadeado], .animar-tela-voltando [data-encadeado]` — `entrar-encadeado 280ms var(--curva) backwards` <br> `.animar-tela-voltando [data-encadeado]` — `entrar-encadeado-lado` <br> `.abertura-diaria [data-encadeado]` — `entrar-encadeado 520ms var(--curva) backwards`                                                                |
 | `entrar-encadeado-lado` | `from` opacity: 0; transform: translateX(-12px) → `to` opacity: 1; transform: none                                                | chamado inline / por JS                                                                                                                                                                                                                                                                                                                                     |
 | `entrar-item-comando`   | `from` opacity: 0; transform: translateY(-6px)                                                                                    | `[cmdk-item]` — `entrar-item-comando 200ms var(--curva) both`                                                                                                                                                                                                                                                                                               |
 | `nascer-barra`          | `from` opacity: 0; transform: scale(0.9) translateY(4px) → `to` opacity: 1; transform: none                                       | `.animar-barra` — `nascer-barra 160ms var(--curva) both`                                                                                                                                                                                                                                                                                                    |
 | `titulo-crescendo`      | `from` opacity: 0; transform: scale(0.9) translateY(6px) → `to` opacity: 1; transform: none                                       | `.titulo-crescendo` — `titulo-crescendo 300ms var(--curva) both`                                                                                                                                                                                                                                                                                            |
-| `assentar-bloco`        | `from` opacity: 0; transform: translateY(4px) → `to` opacity: 1; transform: translateY(0)                                         | `.texto-assentando .ProseMirror > *` — `assentar-bloco 320ms var(--curva) both`                                                                                                                                                                                                                                                                             |
+| `assentar-bloco`        | `from` opacity: 0; transform: translateY(4px) → `to` opacity: 1; transform: translateY(0)                                         | `.texto-assentando .ProseMirror > *` — `assentar-bloco 320ms var(--curva) backwards`                                                                                                                                                                                                                                                                        |
 | `nascer-entrada`        | `from` opacity: 0; transform: translateY(14px) → `to` opacity: 1; transform: none                                                 | `.animar-nascimento` — `nascer-entrada 420ms var(--curva) both`                                                                                                                                                                                                                                                                                             |
 | `halo-nascimento`       | `from` box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-acento-500) 45%, transparent) → `to` box-shadow: 0 0 0 26px transparent | `.animar-nascimento::after` — `halo-nascimento 900ms var(--curva) 220ms both`                                                                                                                                                                                                                                                                               |
 
@@ -993,7 +1073,7 @@ Três convenções valem para todas:
 | `folha-desce`         | `from` opacity: 1; transform: none → `to` opacity: 0; transform: translateY(100%)                                                                       | `.folha-fechando` — `folha-desce 200ms var(--curva-saida) both`                  |
 | `folha-aparece`       | `from` opacity: 0; transform: translateY(10px) → `to` opacity: 1; transform: none                                                                       | `.folha-abrindo` — `folha-aparece 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards` |
 | `folha-some`          | `from` opacity: 1; transform: none → `to` opacity: 0; transform: translateY(10px)                                                                       | `.folha-fechando` — `folha-some 160ms var(--curva-saida) both`                   |
-| `subir-folha`         | `from` opacity: 0; transform: translateY(24px) scale(0.985) → `to` opacity: 1; transform: none                                                          | `.animar-folha` — `subir-folha 240ms var(--curva) both`                          |
+| `subir-folha`         | `from` opacity: 0; transform: translateY(24px) scale(0.985) → `to` opacity: 1; transform: none                                                          | `.animar-folha` — `subir-folha 240ms var(--curva) backwards`                     |
 | `brotar-do-canto`     | `from` opacity: 0; transform: scale(0.82) translateY(8px) → `to` opacity: 1; transform: none                                                            | `.brota-do-botao` — `brotar-do-canto 200ms var(--curva) both`                    |
 | `voltar-para-o-canto` | `from` opacity: 1; transform: none → `to` opacity: 0; transform: scale(0.86) translateY(6px)                                                            | `.volta-para-o-botao` — `voltar-para-o-canto 150ms var(--curva-saida) both`      |
 | `abrir-espaco-aviso`  | `from` max-height: 0; margin-top: -0.5rem; opacity: 0; transform: translateY(10px) → `to` max-height: 20rem; margin-top: 0; opacity: 1; transform: none | `.aviso-abrindo` — `abrir-espaco-aviso 260ms var(--curva) both`                  |
@@ -1049,14 +1129,14 @@ Três convenções valem para todas:
 
 **Travessia lateral**
 
-| `@keyframes`           | Quadros                                                                                                                | Quem usa, e com que atalho                                                                                                                             |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `painel-sai-esquerda`  | `from` opacity: 1; transform: translateX(0) → `to` opacity: 0; transform: translateX(calc(-56px \* var(--sentido, 1))) | `.troca-painel-saindo` — `painel-sai-esquerda 200ms var(--curva-saida) both`                                                                           |
-| `painel-entra-direita` | `from` opacity: 0; transform: translateX(calc(56px \* var(--sentido, 1))) → `to` opacity: 1; transform: none           | `.painel-aba-entrando` — `painel-entra-direita 260ms var(--curva) both` <br> `.troca-painel-entrando` — `painel-entra-direita 260ms var(--curva) both` |
-| `mes-da-direita`       | `from` opacity: 0; transform: translateX(28px)                                                                         | `.entra-da-direita` — `mes-da-direita 220ms var(--curva) both`                                                                                         |
-| `mes-da-esquerda`      | `from` opacity: 0; transform: translateX(-28px)                                                                        | `.entra-da-esquerda` — `mes-da-esquerda 220ms var(--curva) both`                                                                                       |
-| `bolha-minha`          | `from` opacity: 0; transform: translateY(10px) scale(0.94)                                                             | `.bolha-minha` — `bolha-minha 240ms var(--curva) both`                                                                                                 |
-| `bolha-dela`           | `from` opacity: 0; transform: scale(0.9)                                                                               | `.bolha-dela` — `bolha-dela 260ms var(--curva) both`                                                                                                   |
+| `@keyframes`           | Quadros                                                                                                                | Quem usa, e com que atalho                                                                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `painel-sai-esquerda`  | `from` opacity: 1; transform: translateX(0) → `to` opacity: 0; transform: translateX(calc(-56px \* var(--sentido, 1))) | `.troca-painel-saindo` — `painel-sai-esquerda 200ms var(--curva-saida) both`                                                                                     |
+| `painel-entra-direita` | `from` opacity: 0; transform: translateX(calc(56px \* var(--sentido, 1))) → `to` opacity: 1; transform: none           | `.painel-aba-entrando` — `painel-entra-direita 260ms var(--curva) backwards` <br> `.troca-painel-entrando` — `painel-entra-direita 260ms var(--curva) backwards` |
+| `mes-da-direita`       | `from` opacity: 0; transform: translateX(28px)                                                                         | `.entra-da-direita` — `mes-da-direita 220ms var(--curva) both`                                                                                                   |
+| `mes-da-esquerda`      | `from` opacity: 0; transform: translateX(-28px)                                                                        | `.entra-da-esquerda` — `mes-da-esquerda 220ms var(--curva) both`                                                                                                 |
+| `bolha-minha`          | `from` opacity: 0; transform: translateY(10px) scale(0.94)                                                             | `.bolha-minha` — `bolha-minha 240ms var(--curva) both`                                                                                                           |
+| `bolha-dela`           | `from` opacity: 0; transform: scale(0.9)                                                                               | `.bolha-dela` — `bolha-dela 260ms var(--curva) both`                                                                                                             |
 
 **Gestos de ícone**
 
@@ -1203,14 +1283,25 @@ toque fica menor que o cartão e parece recortada. Isso se escreve com `:has()`:
 }
 ```
 
-E aqui vai uma armadilha que custou duas tentativas: **`:is(button, [role="button"], …)` pesa como
-classe**, porque a especificidade de `:is()` é a do argumento mais forte — e um
-seletor de atributo vale uma classe. Um `button:active { transform: none }`
-escrito com seletor de elemento (0,0,1) perde para o piso genérico e é ignorado
-**em silêncio**. Se uma regra de anulação "não está pegando", conte a
-especificidade dos dois lados antes de mexer em qualquer outra coisa; e prefira
-anular pelo caminho completo (`.pasta > h2 > button.x:active`), que é explícito
-e não depende de sorte.
+E aqui vai uma armadilha que custou **três** tentativas: **`:is(button, [role="button"], …)`
+pode pesar mais do que uma classe**, porque a especificidade de `:is()` é a do
+argumento mais forte — e o mais forte de uma lista dessas raramente é o que se
+olha primeiro. `[role="button"]` vale 0,1,0, mas `a[href]` e `label[for]` valem
+**0,1,1**: elemento _mais_ atributo. Um piso escrito como
+`:is(…):not(…):hover` chega a **0,3,1**.
+
+O erro que isso produz é o pior tipo: uma anulação com `.classe.classe:hover`
+vale 0,3,0, **empata nos dois primeiros dígitos e perde no terceiro**, sem erro
+nem aviso — a classe está aplicada no elemento, está escrita no CSS, e o estilo
+continua lá. Somar mais uma cópia da classe resolve, mas é uma corrida que
+recomeça toda vez que alguém acrescenta um argumento ao `:is()`.
+
+**Prefira excluir a anular.** Ponha a classe de escape no `:not()` do próprio
+piso (`:not(:disabled, …, .sem-veu)`) e a regra deixa de casar: não há briga,
+e como `:not()` já carrega uma classe, acrescentar outra não muda a
+especificidade de nada. Se precisar mesmo anular, conte os **três** dígitos dos
+dois lados — e trave a conta num teste, porque ninguém a refaz na revisão
+seguinte.
 
 ### 7.3 Ícones que reagem
 
@@ -2012,6 +2103,215 @@ Sem nenhuma letra no nome (alguém salvo só com emoji), aí sim volta o ícone.
 
 ---
 
+### 8.21 Abas (guias)
+
+Uma fila de palavras com uma barra de acento deslizando por baixo — não
+pílulas, não botões. É o componente das telas com vários painéis sobre o mesmo
+assunto.
+
+```
+fila   role="tablist" esconder-barra relative -mx-5 sm:-mx-3 flex gap-1
+       overflow-x-auto border-b border-[var(--borda)] px-2 sm:px-0
+ ├ aba role="tab" foco-anel sem-veu shrink-0 px-3 pb-3 txt-sm font-semibold
+ │     whitespace-nowrap transition-colors duration-200
+ │     selecionada: text-[var(--texto)] · outra: t3 hover:text-[var(--texto)]
+ └ barra  absolute bottom-0 left-0 h-0.5 rounded-[var(--raio-pilula)] bg-acento-500
+          transition-[transform,width] duration-[var(--tempo-normal)] ease-[var(--curva)]
+          nasce com opacity-0 — só aparece depois de medir a aba selecionada
+```
+
+- **A fila sangra até a borda da tela** (`-mx-5` no celular, igual à margem de
+  `.pagina`): com muitas abas ela rola na horizontal, e rolar dentro de uma
+  caixa recuada corta a última aba no meio. O fio de baixo vai de ponta a
+  ponta.
+- **`sem-veu` é obrigatório.** O véu de hover de todo botão (§3.5) vira um
+  retângulo cinza atrás de uma palavra; a aba já responde pela cor e pela
+  barra.
+- **Uma barra só, que desliza** — posicionada por `transform` e `width`,
+  medida da aba selecionada. Nasce invisível, senão pisca um quadro em zero.
+- **O painel fica montado**, escondido por `hidden`, e não é desmontado ao
+  trocar. Remontar custa o render da tela inteira; e um elemento que sai de
+  `display: none` reinicia as próprias animações, então a entrada do painel
+  (`painel-entra-direita`, 260ms, `backwards`) roda de graça a cada troca.
+- **A aba é estado, e o endereço é espelho.** Guarde a aba num `useState` e
+  espelhe com `history.replaceState(null, "", "?guia=x")`: o link continua
+  apontável e sobrevive ao recarregar, sem acordar o roteador. Trocar de aba
+  por `router.replace` é uma navegação — pedido de payload, render da página
+  inteira, e um engasgo de quase um segundo no celular.
+- Teclado: setas trocam de aba, `Home`/`End` vão às pontas. Leitor de tela:
+  `aria-selected`, `aria-controls` e `aria-labelledby` amarrando aba e painel.
+- Distância da fila ao conteúdo: `mb-8`.
+
+### 8.22 Filtro suspenso
+
+O gatilho de filtro é **um componente** (`<DropdownFiltro>`) e cada opção de
+lista simples outro (`<ItemDoFiltro>`). Toda tela que filtra usa os dois —
+inclusive o seletor de período ao lado de um título (§9.7).
+
+```
+gatilho  flex max-w-[11rem] sm:max-w-none items-center gap-1 sm:gap-1.5
+         rounded-[var(--raio-m)] border px-2.5 sm:px-3.5 py-2 txt-sm font-semibold transition
+         ├ rótulo (truncate) — com `rotuloCurto`, o curto no celular e o longo de `sm` em diante
+         └ ChevronDown 14×14, gira 180° com o painel aberto
+painel   w-[min(14rem,calc(100vw-1rem))] rounded-[var(--raio-m)] border
+         bg-[var(--superficie)] p-1.5 shadow-[var(--sombra-alta)]
+opção    w-full rounded-[var(--raio-p)] px-3 py-2 text-left txt-sm transition
+         escolhida: superficie-2 font-semibold · outra: hover:bg-[var(--superficie-2)]
+```
+
+Três estados do gatilho, e só três:
+
+| Estado                      | Borda                              | Fundo                   | Texto                    |
+| --------------------------- | ---------------------------------- | ----------------------- | ------------------------ |
+| Neutro                      | `--borda` (hover: `--borda-forte`) | `--superficie`          | `.t2` (hover: `--texto`) |
+| Ativo (há filtro) ou aberto | `acento-500`                       | `acento-500/10`         | `--acento-texto`         |
+| Escolha fixa (`solido`)     | `acento-500`                       | acento sólido a **15%** | `--acento-texto`         |
+
+A variante `solido` é para o controle que **sempre** tem um valor (o ano que a
+tela mostra), e não um filtro que pode estar vazio. É a classe
+`.gatilho-escolha`:
+
+```css
+.gatilho-escolha {
+  border-color: var(--color-acento-500);
+  background-color: color-mix(in srgb, var(--acento-solido) 15%, transparent);
+  color: var(--acento-texto);
+}
+```
+
+- **Largura FIXA no painel**, não `min-width`. O painel é `fixed`; sem largura
+  declarada ele encolhe para caber no espaço que sobra à direita de onde
+  nasceu — e dois filtros com a mesma lista abriam com larguras diferentes só
+  por estarem em posições diferentes da fila. Painéis com desenho próprio
+  declaram a sua (emoções `20rem`, pessoas `18rem`), sempre com o
+  `min(…, calc(100vw - 1rem))`.
+- **O painel pinta num portal** (`document.body`), em `z-[61]` sobre um fundo
+  clicável em `z-[60]` que fecha ao tocar fora. Sem o portal, `z-index` não
+  chega: uma lista virtualizada (com `transform`) ou uma animação de entrada
+  cria stacking context depois no DOM, e o menu ficava **atrás** dos cartões.
+- **O miolo de um painel com desenho próprio também é um componente só.** Duas
+  telas que filtram a mesma coisa (uma categoria colorida, uma lista de
+  pessoas com busca) usam o **mesmo** painel, com a diferença de
+  comportamento em uma prop (`multipla`, `disponiveis`). Divergência de cópia
+  não se resolve acertando a cópia — daqui a duas semanas alguém mexe numa e
+  elas se separam de novo. Resolve-se tendo um lugar só.
+- **Painel de categorias**: duas colunas; a opção escolhida pinta o fundo com o
+  tingido da categoria (`--chip-tinta`, §8.3). **Painel de pessoas**: campo de
+  busca no topo (`.campo-busca`), e cada linha com avatar, nome e a relação
+  embaixo em `.t3 .txt-xs` — com trinta pessoas, achar alguém sem busca vira
+  rolagem.
+
+### 8.23 Peças de leitura (gráficos comparativos)
+
+Toda tela de análise é montada com cinco peças. Nada de gráfico desenhado à
+mão por tela.
+
+| Peça               | Desenho                                                                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<Secao>`          | título `.display .txt-lg`; ações à direita na mesma linha (`flex flex-wrap items-baseline justify-between gap-3`, `mb-1`); dica em `.t3 .txt-sm mb-6`                                 |
+| `<CartaoLista>`    | `.cartao` com `grid grid-cols-[auto_minmax(2rem,1fr)_auto] items-center gap-x-3 gap-y-3 p-5` — rótulo, barra, número                                                                  |
+| `<LinhaBarra>`     | rótulo `txt-sm font-semibold` (ícone a `gap-2.5`); trilho `superficie-2 h-2.5` pílula; preenchimento `bg-acento-500` na largura proporcional; valor `.t3 .numeral .txt-xs text-right` |
+| `<NumeroDestaque>` | número `.display .numeral .txt-numero leading-none` (no acento quando é o destaque); unidade `.t3 .txt-xs` embaixo                                                                    |
+| `<Legenda>`        | `.t3 flex items-center gap-1.5 txt-xs`, bolinha de 10px na cor da série                                                                                                               |
+
+- **As três colunas do `CartaoLista` são as mesmas em todas as linhas** — a
+  grade é do cartão, e cada linha é `display: contents`. É o que alinha o
+  começo de todas as barras, qualquer que seja o tamanho do rótulo.
+- A linha pode ser um botão (filtrar por aquele item): o foco vai para o
+  rótulo, com anel próprio, porque `contents` não tem caixa para desenhar.
+
+**A dica no ponteiro** (`useDicaGrafico()`), para gráfico de linha ou barras:
+
+```
+guia vertical  pointer-events-none absolute inset-y-0 w-px (cor --borda-forte)
+caixa          pointer-events-none absolute z-30 w-max max-w-[min(20rem,80vw)]
+               rounded-[var(--raio-m)] border bg-[var(--superficie)] px-3 py-2
+               shadow-[var(--sombra-alta)]
+ ├ cabeçalho   .t3 mb-1 txt-xs font-bold uppercase tracking-wider  (a data, o mês)
+ ├ principal   bolinha 10px + txt-sm font-semibold
+ └ linhas      .t3 mt-0.5 txt-xs
+```
+
+A caixa segue o ponteiro, vira para o outro lado perto da borda, e é
+anunciada por `role="status" aria-live="polite"`. No toque, ela aparece onde o
+dedo está e fica até o próximo toque — não some ao levantar o dedo, senão não
+dá para ler.
+
+### 8.24 Cartão indisponível (trancado)
+
+O que existe mas ainda não pode ser aberto **fica na tela**, no mesmo lugar e
+com a mesma forma — é a regra de §8.16 aplicada a um cartão.
+
+```tsx
+<div aria-disabled className="cartao-forma bg-[var(--trancado)] text-[var(--texto)] *:opacity-40">
+  <span className="rotulo text-[color:inherit]">disponível em 01/01/2027</span>
+  …mesmo miolo do cartão aberto…
+  <Lock className="ml-auto h-4 w-4" /> {/* no lugar da seta */}
+</div>
+```
+
+- **Fundo em `--trancado`**, um token próprio: no claro e no escuro ele é o
+  mesmo tom de `--borda` (o fio que separa as abas); no alto contraste, onde
+  `--borda` vira um cinza médio de verdade, ele passa para a superfície
+  levantada — como preenchimento, o cinza médio derrubaria o texto para 3,2:1.
+  O teste de contraste cobra `--texto` e `--texto-2` sobre `--trancado` nos
+  quatro temas.
+- **O miolo inteiro a 40%** (`*:opacity-40`) — rótulo, número, dados, cadeado.
+  Nos filhos, e não no cartão: apagar o cartão levaria o fundo junto, e ele
+  sumiria na página. Abaixo de 4,5:1 de propósito: controle inativo é isento
+  do mínimo de contraste (WCAG 1.4.3).
+- **Nada de `grayscale` + `opacity` sobre o cartão colorido.** Dá um cinza
+  chapado e escuro, mais pesado que o cartão disponível ao lado — o contrário
+  do que "indisponível" precisa dizer.
+- **O rótulo diz QUANDO**, com a data ("disponível em 01/01/2027"), e não uma
+  frase explicativa embaixo do cartão. Duas voltas para responder a mesma
+  pergunta é uma a mais.
+- A seta de "abrir" vira cadeado, na mesma posição.
+
+### 8.25 Recorte livre de imagem
+
+Para marcar uma área de uma foto (endireitar um documento, recortar um
+avatar), o desenho é um só:
+
+```tsx
+<div className="superficie-2 flex justify-center overflow-hidden rounded-[var(--raio-m)]">
+  <div ref={caixa} className="relative inline-block touch-none select-none">
+    <img className="block h-auto max-h-[min(60dvh,32rem)] w-auto max-w-full" />
+    <svg className="pointer-events-none absolute inset-0 h-full w-full"
+         viewBox={`0 0 ${larguraNatural} ${alturaNatural}`} preserveAspectRatio="none">
+      <path fillRule="evenodd" fill="rgb(0 0 0 / 0.45)"
+            d={`M0 0H${L}V${A}H0Z M${cantos…}Z`} />          {/* fora escurecido */}
+      <polygon points={cantos} fill="none" stroke="#fff" strokeWidth={2}
+               strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+    {/* um puxador por canto */}
+    <button className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 touch-none
+                       rounded-[var(--raio-pilula)] border-[3px] border-white
+                       bg-[var(--color-acento-500)] shadow-[var(--sombra)]" />
+  </div>
+</div>
+```
+
+- **Coordenadas em pixels da imagem**, com o `viewBox` do tamanho natural
+  dela. O atributo `points` do SVG **não aceita porcentagem** — escrever
+  `50%,20%` ali é um polígono que nunca é desenhado, e a tela mostra quatro
+  bolinhas soltas sem dizer que área elas marcam.
+- `vectorEffect="non-scaling-stroke"` mantém a linha em 2px em qualquer escala.
+- **A foto inteira cabe na tela** (`max-h-[min(60dvh,32rem)]`). Ocupando a
+  largura e crescendo para baixo, os cantos de baixo de uma foto em pé ficavam
+  fora da tela — e com `touch-none` não dava nem para rolar até eles.
+- **Desenhe os cantos ORDENADOS** (topo-esquerda, topo-direita,
+  baixo-direita, baixo-esquerda): arrastar um canto por cima do vizinho não
+  pode virar uma gravata-borboleta. Cada canto anda sozinho — a área é
+  qualquer quadrilátero.
+- O invólucro é `inline-block` justo na foto: é a caixa dele que converte o
+  dedo em pixel da imagem.
+- Recorte de avatar é o mesmo desenho com um quadrado: moldura `border-2
+border-white` e o escurecido por `box-shadow: 0 0 0 9999px rgb(0 0 0 /
+0.45)`.
+
+---
+
 ## 9. Moldura e navegação
 
 ### 9.1 A casca
@@ -2105,36 +2405,141 @@ trocar de aba.
 
 ### 9.4 Telas imersivas
 
-Escrever, conversar, entrar e a retrospectiva **não têm barra de navegação** —
-nem a folga que ela exige, nem a animação de entrada. Ali a tela abre com o
-cursor já no campo, e qualquer movimento atrapalha quem começou a digitar. Elas
-usam `flex h-[100svh] flex-col overflow-hidden`.
+Escrever, conversar, entrar e qualquer sequência em tela cheia **não têm barra
+de navegação** — nem a folga que ela exige, nem a animação de entrada. Ali a
+tela abre com o cursor já no campo, e qualquer movimento atrapalha quem
+começou a digitar. Elas usam `flex h-[100svh] flex-col overflow-hidden`.
 
-Defina isso como uma função só (`telaImersiva(caminho)`) e consulte-a nos dois
-lugares que precisam saber (a navegação e o `<main>`).
+Defina isso como uma função só (`telaImersiva(caminho)`) e consulte-a nos
+lugares que precisam saber (a navegação, o `<main>` e a trava de rolagem de
+§9.4-b).
+
+**Palco em tela cheia, moldura flutuando.** Uma sequência de cenas (um
+resumo do ano, um tutorial, um "stories") tem controles em cima (progresso,
+fechar) e embaixo (voltar, avançar). Montá-la como coluna flex — barra, palco,
+rodapé — dá ao palco só a faixa do meio: a cena que pinta um fundo próprio
+pinta essa faixa, e sobram duas tarjas pretas, como se a tela tivesse borda.
+O desenho certo:
+
+```
+palco-da-sequencia  fixed inset-0 z-[100] overflow-hidden
+ ├ palco            absolute inset-0 (a cena ocupa a tela INTEIRA)
+ ├ véu de cima      absolute inset-x-0 top-0 h-36, gradiente preto 45% → transparente
+ ├ véu de baixo     o mesmo, de baixo para cima
+ ├ progresso        absolute inset-x-0 top-0 z-20, padding-top: safe-area + 1rem
+ ├ fechar           absolute right-4 z-20, top: safe-area + 2.75rem, 40×40
+ └ rodapé           absolute inset-x-0 bottom-0 z-20, padding-bottom: safe-area + 1.5rem
+```
+
+- **O respiro é da cena**, não do palco: `padding-top: safe-area + 4.25rem` e
+  `padding-bottom: safe-area + 5.5rem`. É o que impede o conteúdo de nascer
+  debaixo dos controles agora que a cena vai de ponta a ponta.
+- **Os véus são só sombra**: sem eles, o branco da barra de progresso some
+  numa cena de fundo claro.
+- **O palco é escuro nos dois temas.** É uma sala com a luz apagada; trocar de
+  fundo com o tema tiraria dela a única coisa que todas as cenas têm em comum.
+- Uma cena por vez, e não rolagem contínua: com rolagem, duas cenas ficam na
+  tela ao mesmo tempo e nenhuma "começa". Tocar na metade direita avança, na
+  esquerda volta; arrastar para cima avança; setas e espaço no teclado; e um
+  botão visível no rodapé, porque gesto invisível não é interface. **Sem
+  avanço automático** — o tempo é de quem está lendo.
+
+### 9.4-b Trava de rolagem, com contagem
+
+Folha, menu e qualquer camada que trava a página **não** salvam e devolvem
+`document.body.style.overflow`. Com duas abertas ao mesmo tempo (um aviso em
+cima de outra folha), a que fechava por último restaurava o `hidden` que a
+outra tinha posto — e a página ficava muda até recarregar.
+
+```ts
+let travas = 0;
+export function trancarRolagem(): () => void {
+  travas += 1;
+  aplicar();
+  let solto = false;
+  return () => {
+    if (solto) return; // soltar duas vezes não desconta duas
+    solto = true;
+    travas = Math.max(0, travas - 1);
+    aplicar();
+  };
+}
+function aplicar() {
+  document.body.style.overflow = travas > 0 ? "hidden" : "";
+  // com rolagem suave (Lenis): parar com trava OU em tela imersiva; senão, religar
+}
+```
+
+A primeira trava, a última solta. Sempre. E quem vai desmontar a tela com uma
+folha aberta (juntar, excluir, navegar) **fecha a folha antes** — a limpeza
+do efeito é o que devolve a trava.
+
+**Rolagem suave não mexe no toque.** Com Lenis, deixe o dedo com o sistema:
+
+```ts
+new Lenis({
+  virtualScroll: (d) => !d.event.type.includes("touch"),
+  // …
+});
+```
+
+Parado (tela imersiva, folha aberta), o manipulador padrão dá
+`preventDefault` em todo gesto de toque que não nasceu num
+`data-lenis-prevent` — e no celular isso mata a rolagem nativa das listas de
+dentro. E ao parar, o Lenis põe `overflow: clip` no `html`: nas telas
+imersivas, devolva `overflow: visible` (`html.lenis-stopped`) — o `<main>`
+imersivo já é `overflow-hidden`, e um ancestral com `clip` faz o iOS recusar
+o dedo nas listas internas.
 
 ### 9.5 Navegação — desktop
 
-Coluna fixa à esquerda a partir de `lg`:
+Coluna fixa à esquerda a partir de `lg`. Estas são as medidas **exatas** — é
+com elas que dois apps diferentes saem com a mesma coluna, pixel por pixel:
 
 ```
-aside: sticky top-0 z-40 h-dvh w-64 xl:w-72 shrink-0 border-r px-4 py-6
-       hidden lg:flex flex-col
+aside  sticky top-0 z-40 hidden lg:flex h-dvh w-64 xl:w-72 shrink-0
+       flex-col border-r px-4 py-6
+ ├ linha da marca   mb-8 flex items-center justify-between gap-2 px-2.5
+ │   ├ <Logo tamanho={30}/> dentro de um link para o início
+ │   └ ação da pessoa (opcional) — botão de ícone, alinhado à direita
+ ├ nav              relative flex flex-col gap-1
+ │   ├ <Trilho>     superficie-2 rounded-[var(--raio-m)]   (fundo do ativo)
+ │   └ item         group relative z-10 flex items-center gap-3
+ │                  rounded-[var(--raio-m)] px-2.5 py-2.5 txt-sm font-medium
+ │                  transition-colors
+ │                  ativo: text-[var(--texto)] · inativo: t2 hover:text-[var(--texto)]
+ │       └ ícone    18×18, strokeWidth 2, acento SÓ no ativo
+ ├ ações            mt-5 flex flex-col gap-3
+ │   ├ primária     <BotaoLink largo> com ícone de 16px, traço 2.6
+ │   └ secundária   <BotaoLink largo variante="superficie"> (se houver)
+ └ pé               mt-auto → <p class="t3 px-2.5 txt-xs leading-relaxed">v1.2.3</p>
 ```
 
-- **Primeira linha: marca à esquerda, conta à direita.** O canto superior
-  direito da coluna é de quem está usando o app — avatar, ou o botão de uma
-  camada que acompanha a pessoa. 32px de folga abaixo.
-- `<nav className="relative flex flex-col gap-1">` com um `<Trilho>` deslizante
-  ao fundo (`superficie-2 rounded-xl`).
-- Item: `relative z-10 flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-sm
-font-medium`; ativo em `--texto`, inativo em `.t2`. Ícone de 18px,
-  `strokeWidth 2`, **acento só no ativo**.
-- Ações principais logo abaixo da lista: a primária larga, a secundária em
-  variante superfície. **Ou** — quando o app já tem uma camada flutuante no
-  canto (agente, ajuda) — a primária vira um botão flutuante empilhado com ela,
-  e a coluna fica só com navegação. Escolha um dos dois e não repita.
-- Versão do app no rodapé, em `.t3 .txt-xs`.
+| Medida                   | Valor                                                                                | Por quê                                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Largura                  | 256px; 288px a partir de `xl`                                                        | Cabe o rótulo mais longo sem quebrar, e não rouba a coluna de leitura                                                                                   |
+| Margem interna da coluna | 16px nas laterais, 24px em cima e embaixo                                            | —                                                                                                                                                       |
+| Recuo da linha da marca  | `px-2.5` (10px)                                                                      | **Alinha o símbolo com os ícones dos itens**, que também estão a 10px da borda do item. Sem isso a marca fica 10px mais à esquerda que tudo abaixo dela |
+| Marca → primeiro item    | `mb-8` (32px)                                                                        | —                                                                                                                                                       |
+| Entre itens              | `gap-1` (4px)                                                                        | O trilho desliza por baixo; mais folga faria ele "pular"                                                                                                |
+| Item                     | 10px de recuo, 10px em cima e embaixo, 12px entre ícone e rótulo; texto `txt-sm` 500 | Alvo de ~40px sem parecer botão                                                                                                                         |
+| Lista → ações            | `mt-5` (20px)                                                                        | —                                                                                                                                                       |
+| Entre ações              | `gap-3` (12px)                                                                       | —                                                                                                                                                       |
+| Versão                   | `mt-auto`, `.t3 .txt-xs`, mesmo recuo de 10px                                        | Presente para quem procurar, sem competir                                                                                                               |
+
+Três regras de conteúdo:
+
+- **O canto oposto à marca é da pessoa.** O lado direito da primeira linha
+  fica com o que acompanha quem está usando o app (avatar, cota, uma camada de
+  ajuda) — um botão de ícone, nunca texto. Se o app não tem nada assim, o
+  canto fica vazio: não se inventa um enfeite para preencher.
+- **Acento só no ícone do item ativo.** O rótulo ativo vai em `--texto`; o
+  trilho é `superficie-2`. Rótulo colorido e fundo colorido juntos gritam.
+- **Ações principais ficam logo abaixo da lista**, e não no pé: a primária
+  larga, a secundária em variante superfície. **Ou** — quando o app já tem uma
+  camada flutuante no canto (agente, ajuda) — a primária vira um botão
+  flutuante empilhado com ela, e a coluna fica só com navegação. Escolha um
+  dos dois e não repita.
 
 **A marca, medida.** Ela é um componente com um só número de entrada — o lado do
 símbolo — e todo o resto sai dele por proporção. É o que faz a marca de 30px do
@@ -2154,18 +2559,20 @@ palavra:   .display, font-size = tamanho × 0.72, letter-spacing -0.045em,
            em caixa baixa, na cor de texto padrão — NUNCA no acento
 ```
 
-| Onde                      | `tamanho` | Posição                                   |
-| ------------------------- | --------- | ----------------------------------------- |
-| Trilho do desktop         | 30px      | topo da coluna, `px-4 py-6`, `mb-8`       |
-| Cabeçalho do celular      | 30px      | à esquerda, `mb-6`, some a partir de `lg` |
-| Tela de entrar / abertura | 56px      | centralizada, acima do título             |
-| Ícone de app / favicon    | 16–32px   | só o símbolo, sem palavra                 |
+| Onde                      | `tamanho` | Posição                                                     |
+| ------------------------- | --------- | ----------------------------------------------------------- |
+| Trilho do desktop         | 30px      | topo da coluna, `px-4 py-6`, `mb-8`                         |
+| Cabeçalho do celular      | 30px      | **só o símbolo**, à esquerda, `mb-6`, some a partir de `lg` |
+| Tela de entrar / abertura | 56px      | centralizada, acima do título                               |
+| Ícone de app / favicon    | 16–32px   | só o símbolo, sem palavra                                   |
 
 Três regras: a palavra **nunca** vem no acento (o símbolo já é a cor da marca, e
 duas coisas coloridas lado a lado brigam); o `gap` é `2.5` (10px) em qualquer
-tamanho — proporcional ficaria frouxo nos tamanhos grandes; e a marca **não é
-link para lugar nenhum no desktop**, porque o item "início" do trilho está logo
-abaixo dela e dois caminhos para a mesma tela é um deles a mais.
+tamanho — proporcional ficaria frouxo nos tamanhos grandes; e a marca **é link
+para o início**, com `aria-label` ("ir para o início"), no desktop e no
+celular. É o que qualquer pessoa tenta primeiro quando se perde, e no celular
+— onde o item "início" pode estar escondido no menu — é o único caminho
+visível de volta.
 
 O símbolo desenhado precisa funcionar a 16px. Aqui são três barras num quadrado
 arredondado — de perto, linhas de texto; de longe, uma onda de voz. Se o seu
@@ -2183,24 +2590,54 @@ menu que não navega, e vira o primeiro lugar onde todo mundo clica por engano.
 
 ### 9.6 Navegação — celular
 
-Pílula flutuante no rodapé, não barra colada:
+Pílula flutuante no rodapé, não barra colada. As medidas exatas:
 
 ```
-fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-3 pb-segura lg:hidden
- └ nav: flex items-center gap-1 rounded-full border p-1.5
-        shadow-[var(--sombra-alta)] backdrop-blur-xl
-        background: color-mix(in srgb, var(--superficie) 82%, transparent)
+invólucro  pb-segura fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-3 lg:hidden
+ └ nav     relative z-40 flex items-center gap-1 rounded-[var(--raio-pilula)] border p-1.5
+           shadow-[var(--sombra-alta)] backdrop-blur-xl
+           background: color-mix(in srgb, var(--superficie) 82%, transparent)
+    ├ <Trilho>        superficie-2 rounded-[var(--raio-pilula)]
+    ├ item fixo ×2    relative z-10 flex h-11 items-center gap-2 px-4
+    │                 rounded-[var(--raio-pilula)] txt-sm font-semibold
+    │                 transition-colors duration-[var(--tempo-rapido)]
+    │                 ativo: text-[var(--texto)] · inativo: t3
+    │   ├ ícone       19×19, strokeWidth 2.1, acento só no ativo
+    │   └ rótulo      SÓ quando ativo ({ativo && <span>rótulo</span>})
+    ├ "mais"          h-11 w-11, ícone ChevronUp 20×20 traço 2.1, gira 180° aberto
+    │   └ menu        absolute bottom-full right-0 mb-3 w-44 flex flex-col gap-1
+    │                 rounded-[var(--raio-g)] border p-1.5 shadow-[var(--sombra-alta)]
+    │                 backdrop-blur-xl  (mesmo fundo translúcido da pílula)
+    │       └ item    flex h-11 items-center gap-3 px-3 rounded-[var(--raio-m)]
+    │                 txt-sm font-semibold · ícone 18×18 traço 2.1
+    ├ separador       mx-0.5 h-6 w-px bg-[var(--borda)]
+    └ ação principal  botão de ícone 44×44, SEM padding, ícone 22×22 traço 2.5
 ```
 
-- **Só os dois primeiros destinos** ficam visíveis; o resto vai para um menu que
-  brota do botão `⌄` (`.brota-do-botao`, 200ms) e volta para ele ao fechar
-  (`.volta-para-o-botao`, 150ms — o mesmo número no CSS e no `setTimeout` que
-  adia o desmonte).
+- **Dois destinos fixos, escolhidos pelo endereço** — o início e o destino que
+  a pessoa mais usa depois dele — e não "os dois primeiros da lista": a ordem
+  da lista é a do desktop, e ela muda quando um item entra ou sai por plano.
+  O resto vai para o menu "mais", que brota do botão (`.brota-do-botao`,
+  200ms) e volta para ele ao fechar (`.volta-para-o-botao`, 150ms — o mesmo
+  número no CSS e no `setTimeout` que adia o desmonte).
+- **Quando a tela atual está no menu, o trilho cobre o "mais".** Sem isso,
+  quem está numa tela do menu vê a barra sem nenhum item ativo.
 - **O rótulo só aparece no item ativo**, para a pílula não inchar. O `Trilho`
   acompanha a mudança de largura via `ResizeObserver`.
-- Separador de 1px, e a ação principal como botão de ícone de 44px com o ícone
-  em 30px — é o gesto mais disputado da barra; cresce o ícone, não o alvo.
+- **Inativo em `.t3`, não `.t2`.** Na pílula translúcida, sobre conteúdo, o
+  inativo precisa recuar mais do que na coluna do desktop.
+- **O "+" é 22px com traço 2.5, e não 20 com 2.1 como a seta.** O `Plus` tem
+  mais vazio interno que o `ChevronUp` (traços de 5 a 19 no viewBox 24): na
+  mesma caixa ele parece menor e mais fraco. O círculo continua 44px — cresce
+  o ícone, não o alvo. E o botão vai **sem padding** (`nav a[data-icone="mais"]
+{ padding: 0 }`): com o `px-4` do botão médio, o svg encolhia no flex.
+- Fundo do menu aberto: `fixed inset-0 z-30 bg-black/5 backdrop-blur-sm`
+  (`dark:bg-black/20`), com `.animar-fade-in`; tocar nele fecha.
 - A barra **não some ao rolar**. Ela é o chão do app.
+- **Nada de `view-transition-name` na barra.** Um elemento nomeado para View
+  Transition é fotografado e promovido para a camada da transição — e ali o
+  `backdrop-filter` não tem o que amostrar. O desfoque da barra "sumia de vez
+  em quando": era quando havia transição em curso.
 
 ```css
 /* 44px do item + 6px de padding em cima e embaixo + 12px de folga. O <main>
@@ -2216,19 +2653,58 @@ fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-3 pb-segura lg:hidden
 
 ### 9.7 Cabeçalho de tela
 
-No celular, uma faixa com a marca e as ações; no desktop ela some (a marca já
-está na coluna).
+Duas peças, sempre nesta ordem: a **faixa do celular** (marca e ações) e o
+**cabeçalho da tela** (rótulo e título). No desktop a faixa some — a marca já
+está na coluna.
 
 ```tsx
-<CabecalhoMobile>{acoes}</CabecalhoMobile>   {/* mb-6 flex justify-between lg:hidden */}
+{
+  /* 1. Faixa do celular */
+}
+<div className="relative z-40 mb-6 flex items-center justify-between lg:hidden">
+  <Link href="/" aria-label="ir para o início">
+    <Simbolo tamanho={30} />
+  </Link>
+  <div className="flex items-center gap-2">
+    {acoesDaTela} {/* botões de ícone da tela, se houver */}
+    {acaoDaPessoa} {/* SEMPRE a última, na ponta direita */}
+  </div>
+</div>;
+
+{
+  /* 2. Cabeçalho da tela */
+}
 <header className="mb-8">
-  <p className="rotulo mb-2.5">contexto em caixa alta</p>
-  <h1 className="display txt-display">título em caixa baixa</h1>
-</header>
+  <p className="cabecalho-encolhe rotulo mb-2.5">contexto em caixa alta</p>
+  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-3">
+    <h1 className="cabecalho-encolhe display txt-display">título em caixa baixa</h1>
+    {controleDaTela} {/* um seletor, no máximo — ver "filtro" abaixo */}
+  </div>
+</header>;
 ```
 
-O rótulo pode ser dinâmico e dar o estado ("47 entradas até aqui"). O título é
-sempre curto e em caixa baixa.
+| Medida                       | Valor                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| Faixa do celular → cabeçalho | `mb-6` (24px)                                                              |
+| Símbolo da faixa             | 30px, **sem a palavra** — no celular a palavra disputa espaço com as ações |
+| Entre as ações da faixa      | `gap-2` (8px)                                                              |
+| Rótulo → título              | `mb-2.5` (10px)                                                            |
+| Título → conteúdo            | `mb-8` (32px) no `<header>`                                                |
+| Título                       | `.display .txt-display` — ver §4.1 para o tamanho em cada largura          |
+| Título ↔ controle            | `gap-x-4` na mesma linha; `gap-y-3` quando quebra                          |
+
+- **A ação da pessoa é sempre a última à direita**, em toda tela — a mesma do
+  canto da coluna do desktop. A tela põe as dela à esquerda disso.
+- O rótulo pode ser dinâmico e dar o estado ("47 entradas até aqui"). O título
+  é sempre curto e em caixa baixa.
+- **O título encolhe ao rolar** (§6.3, `.cabecalho-encolhe`): a classe vai no
+  **rótulo e no título, um por um — nunca no `<header>`**. No cabeçalho
+  inteiro, o controle que mora ao lado do título (um seletor de ano, por
+  exemplo) encolhia junto e ia sumindo da tela enquanto se rolava: ele é um
+  controle, não um enfeite do título. Pelo mesmo motivo, cartão ou faixa logo
+  abaixo do cabeçalho **não** recebe a classe.
+- `transform-origin: left top` — o título encolhe em direção ao canto onde o
+  olho já está, e não para o centro.
 
 **Filtro não é ação de cabeçalho.** Passo de mês, popover de categoria e
 segmentado vão para a **primeira faixa do conteúdo**, junto da busca — nunca
@@ -2735,3 +3211,17 @@ Antes de dar uma tela por pronta:
 - [ ] Carregamento tem o formato do conteúdo; a roda girando é a terceira opção.
 - [ ] Todo caminho de saída respeita o que a interface diz estar protegido
       (§10.8) — lista, busca, IA, exportação, impressão, link público.
+- [ ] Animação de entrada com `backwards`, nunca `both` — o último quadro não
+      pode ficar aplicado (§6.6). Exceção: a ligada à rolagem.
+- [ ] Coluna e pílula de navegação com as medidas de §9.5 e §9.6 — inclusive o
+      `px-2.5` que alinha a marca com os ícones, e o "+" de 22px.
+- [ ] `.cabecalho-encolhe` no rótulo e no título, um por um — nunca no
+      `<header>` nem no que vem abaixo dele.
+- [ ] Abas, filtro suspenso e peças de gráfico são os componentes de §8.21–§8.23,
+      e o miolo de um filtro repetido em duas telas é UM componente.
+- [ ] O que está indisponível fica na tela como §8.24: `--trancado`, miolo a
+      40%, a data no rótulo.
+- [ ] Nenhuma camada devolve o `overflow` do `body` à mão: é `trancarRolagem()`,
+      com contagem (§9.4-b).
+- [ ] Tela em sequência tem palco `inset-0` e moldura flutuando — nenhuma
+      tarja da cor da página em cima ou embaixo da cena.

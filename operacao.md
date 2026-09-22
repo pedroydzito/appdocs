@@ -154,7 +154,6 @@ São cinco peças. Faltando qualquer uma, o navegador não oferece a instalaçã
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f5f4f0",
-  "theme_color": "#f5f4f0",
   "lang": "pt-BR",
   "dir": "ltr",
   "categories": ["productivity"],
@@ -181,18 +180,20 @@ O que cada campo decide, na prática:
   navegador.
 - **`background_color`** é a cor da tela de abertura, antes de o app pintar.
   Use o **mesmo** `--fundo` do tema claro, senão a abertura pisca.
-- **`theme_color`** tinge a barra de status. Declare também no viewport, com
-  variação por tema:
+- **Sem `theme_color`**, de propósito. Num app instalado ele ganha da meta
+  `theme-color` da página e é lido **uma vez**, na instalação: a barra de
+  status fica presa naquela cor para sempre, inclusive com o app no tema
+  escuro. Também **nada de `themeColor` no `viewport` do framework**: com
+  `media="(prefers-color-scheme)"` ele responde ao SISTEMA, não ao tema que a
+  pessoa escolheu no app, e o Next o reescreve a cada navegação. A barra é
+  uma meta só, criada pelo script que roda antes da primeira pintura, com o
+  `--fundo` computado — ver design system §9.1b.
 
 ```ts
 export const viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover", // necessário para as áreas seguras
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f4f0" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
-  ],
 };
 ```
 
@@ -654,6 +655,14 @@ commit precisa dizer por quê — e essa frase é a revisão.
 Cadastre as variáveis nos **três** ambientes da hospedagem. Variável de ambiente
 só passa a valer no próximo build — mudou, redeploy.
 
+**Pré-visualização não é entrega.** Ela sobe sozinha a cada push num ramo, e é
+um efeito colateral, não um destino. O trabalho só está pronto quando está em
+`main`: pull request, CI verde, **merge**. Um PR parado em rascunho "esperando
+alguém lembrar dele" é trabalho que não existe para quem usa o app — e, com o
+tempo, um conflito esperando para acontecer. Se quem trabalha no repositório é
+um agente, escreva essa regra no arquivo de instruções dele: por padrão, ele
+para no PR.
+
 ### 13.2 Domínio e HTTPS
 
 HTTPS é requisito do PWA, não preferência. Aponte o domínio, deixe a plataforma
@@ -671,6 +680,36 @@ origem, e trocar de domínio depois é pedir para todo mundo reinstalar.
 7. Instalar no celular e repetir o teste de modo avião (§5).
 
 ---
+
+### 13.4 O armazenamento das funções que só cresce
+
+Na Vercel, o "Functions Storage" da conta sobe a cada deploy — e **não desce**
+ao apagar deploys antigos na hora. Meça antes de culpar a plataforma: o Next
+gera um rastro por função (`.next/server/**/*.nft.json`) com todo arquivo que
+ela arrasta. Some os tamanhos.
+
+O caso comum é o `sharp`: o Next o arrasta para **todas** as rotas, com um
+binário por sistema operacional. No app de referência eram 54 MB por função,
+62 funções, ~1,6 GB por deploy — 1,27 GB disso era o `sharp`. As funções rodam
+em Linux com glibc; a variante `musl` (para Alpine) nunca é carregada, e a de
+WebAssembly é a reserva para quando não há binário nativo.
+
+```ts
+// next.config.ts
+outputFileTracingExcludes: {
+  "*": [
+    "node_modules/@img/sharp-linuxmusl-*/**",
+    "node_modules/@img/sharp-libvips-linuxmusl-*/**",
+    "node_modules/@img/sharp-wasm32/**",
+  ],
+},
+```
+
+Mantém `sharp-linux-x64` e `sharp-libvips-linux-x64`, então a otimização de
+imagem dentro da função continua possível — e na Vercel quem serve
+`/_next/image` é a plataforma, com o sharp dela. Medido de novo: 857 MB por
+deploy, 47% a menos. Meça **de novo** depois de mudar: é um número, não uma
+impressão.
 
 ## 14. Versão e release
 
@@ -695,13 +734,13 @@ origem, e trocar de domínio depois é pedir para todo mundo reinstalar.
 
 ## 15. Observar e diagnosticar
 
-| Peça                       | Para quê                                            |
-| -------------------------- | --------------------------------------------------- |
-| RUM (LCP/INP/CLS por rota) | saber o que está lento **para quem usa**            |
-| Log estruturado (JSON)     | achar o evento sem `grep` em texto livre            |
-| Relato de erro do cliente  | ver o que quebra no aparelho dos outros             |
-| Ouvintes globais           | `error` e `unhandledrejection`                      |
-| Validação de ambiente      | falhar no boot dizendo o nome da variável que falta |
+| Peça                       | Para quê                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| RUM (LCP/INP/CLS por rota) | saber o que está lento **para quem usa** — na Vercel, Web Analytics + Speed Insights, no app e nas páginas públicas |
+| Log estruturado (JSON)     | achar o evento sem `grep` em texto livre                                                                            |
+| Relato de erro do cliente  | ver o que quebra no aparelho dos outros                                                                             |
+| Ouvintes globais           | `error` e `unhandledrejection`                                                                                      |
+| Validação de ambiente      | falhar no boot dizendo o nome da variável que falta                                                                 |
 
 Duas regras não negociáveis:
 
@@ -713,6 +752,13 @@ Duas regras não negociáveis:
 Com menos de ~100 visitas, o painel de campo oscila demais para significar
 alguma coisa. Até lá, o número que vale é o do orçamento de bundle, que é
 determinístico.
+
+**O motivo vai para o log, não o sintoma.** Quando um serviço externo devolve
+"nada" sem erro (um modelo de IA que para com `finishReason` de bloqueio, uma
+API que responde 200 vazio), registre o **motivo** que ele deu, com o tamanho
+da entrada — nunca o conteúdo. "Não consegui ler esse arquivo" na tela, sem o
+motivo no log, é um bug que só se investiga reproduzindo, e às vezes não se
+reproduz.
 
 ---
 
@@ -819,7 +865,8 @@ Duas outras coisas que essa janela costuma esquecer:
 - [ ] Buckets privados, URLs assinadas, arquivos apagados junto do registro.
 - [ ] Rotas de API com tempo limite, validação de entrada e limite de taxa.
 - [ ] Tarefas agendadas protegidas por segredo e idempotentes.
-- [ ] Manifesto válido, ícones 192/512/maskable/apple, `theme_color` por tema.
+- [ ] Manifesto válido, ícones 192/512/maskable/apple, **sem** `theme_color`
+      (a barra vem da meta que segue o tema, design system §9.1b).
 - [ ] Service worker registrado só em produção, com versão e página offline.
 - [ ] Instalado no celular: ícone certo, sem barra de navegador, áreas seguras
       respeitadas, funciona em modo avião.
@@ -831,3 +878,7 @@ Duas outras coisas que essa janela costuma esquecer:
 - [ ] Métricas de campo chegando; log sem campo proibido.
 - [ ] Exportar, importar e apagar a conta funcionam.
 - [ ] Versão visível no app.
+- [ ] Rastro das funções medido (`*.nft.json`); variantes de binário que a
+      plataforma não carrega estão fora (§13.4).
+- [ ] O fluxo de entrega termina em `main`, e o arquivo de instruções do agente
+      diz isso (§13.1).
