@@ -444,6 +444,23 @@ sobre fundo pintado, transparente ou imagem. E não mexe em `background-color`,
 então quem tem cor própria (o primário, o de perigo, o chip da emoção) a mantém
 com o véu por cima.
 
+O véu pinta a **caixa do controle**. Três regras decidem o tamanho dessa caixa:
+
+1. **O controle é o cartão.** O hover é o cartão inteiro, no raio do cartão
+   (`--raio-cartao`). Um título clicável dentro do cartão não ganha um
+   retângulo menor em volta das letras. O botão invisível `.alvo-do-cartao`
+   cobre o cartão (`inset: 0`, `border-radius: inherit`); o texto por cima
+   fica com `pointer-events: none`, e a ação secundária (apagar, um link)
+   fica por cima, com o próprio ponteiro.
+2. **O controle é uma linha dentro de um cartão com várias** (uma barra de
+   comparação, um nome numa lista, um item do índice). O hover é a linha
+   inteira, no raio do cartão (`.linha-alvo`). Não é o cartão, porque cada
+   linha vai para um lugar, e não é um retângulo colado nas letras.
+3. **O controle é texto solto**, fora de cartão (baixar um áudio, um link de
+   rodapé). A caixa cresce com `.respiro-veu`: margem negativa e o mesmo
+   padding, raio `--raio-cartao`. Não ponha `rounded-*` em cima dessa classe.
+   O raio de controle (`--raio-p`) ao lado de um cartão parece quadrado demais.
+
 ### 3.6 O contraste é testado
 
 Um teste lê o `globals.css`, extrai os tokens dos quatro temas e reprova o build
@@ -2312,6 +2329,97 @@ border-white` e o escurecido por `box-shadow: 0 0 0 9999px rgb(0 0 0 /
 
 ---
 
+### 8.26 Distribuição (partes de um todo)
+
+Quando os números **somam um total** (planos das contas, jeitos de criar um
+item, formas de login), uma barra por item mente: cada uma parece medir uma
+coisa diferente, e o olho compara comprimentos que não têm a mesma base.
+
+```
+27 contas                          ← .numeral txt-numero + unidade em t3
+[████████████|██████████|▌]        ← UMA barra h-3, fatias com gap de 0.5
+● Cortesia     13   48%            ← legenda: bolinha, rótulo, número, %
+● Grátis       14   52%
+● Pago          0    0%            ← item zerado fica na legenda, em t3
+```
+
+- A barra é uma só, pílula, fundo `superficie-2`; cada fatia leva a cor da
+  categoria. Fatia zerada não é desenhada, mas o item continua na legenda —
+  "zero pagantes" é informação.
+- O total vem em cima, grande. Sem ele, a porcentagem não diz de quanto.
+- Três distribuições cabem lado a lado no desktop (`lg:grid-cols-3`); no
+  celular empilham.
+- Comparação que **não** soma um total (ranking, evolução) continua sendo a
+  linha de barra da §8.23.
+
+### 8.27 Busca com filtro e ordem
+
+A barra de filtros em chips, com seletor de ordem ao lado, ocupa duas linhas
+no celular e vira ruído no desktop. A forma enxuta:
+
+```
+[ 🔍 Buscar por nome ou e-mail            ] [⚙] [⇅]
+12 itens · Cortesia · A a Z                          ← resumo em t3 txt-xs
+```
+
+- Campo de busca (`.campo-busca`, `h-11`) e **dois quadrados de ícone** do
+  mesmo tamanho e da mesma moldura: filtro e ordem.
+- Cada quadrado abre uma `<Folha>` com a lista de opções: rótulo, uma linha
+  de explicação ou contagem, e o ✓ na escolhida. Escolher fecha a folha.
+- Filtro ligado ganha um ponto de acento no canto do quadrado — sem ele, a
+  pessoa esquece que a lista está filtrada.
+- A linha de resumo embaixo diz o que está valendo; é ela que responde "por
+  que só tem 3 aqui?".
+
+### 8.28 Fileira de gente
+
+Pessoas em destaque (as que mais fizeram algo, as mais citadas) aparecem como
+**cartões de pessoa**, não como lista: foto de 64px, nome em `txt-md
+font-bold`, a contagem em `t3 txt-xs` embaixo.
+
+- Desktop: grade (`sm:grid-cols-3 lg:grid-cols-6`).
+- Celular: fileira que rola na horizontal, sangrando até a borda (`-mx-4
+px-4`), cartões de largura fixa (`w-32`), sem `snap`.
+- Posição num ranking vai como sobrancelha no canto (`1º`), não como número
+  grande: o rosto é o que se reconhece primeiro.
+- Grade de pessoas **como tela inteira** (uma lista longa de contas, de
+  contatos) é o mesmo cartão em `grid-cols-2 sm:grid-cols-3 md:grid-cols-4` —
+  lista de linhas com tudo à esquerda deixa metade da tela vazia no desktop.
+
+### 8.29 Cartão de valor: três por linha, número curto e clicável
+
+A §8.14 pede um cartão de valor por linha no celular. Quando a leitura
+depende de ver os três números **juntos** (usuários, ativos, entradas), vale a
+fileira de três em qualquer largura, com três cuidados:
+
+1. O número encolhe um degrau no celular (`txt-titulo sm:txt-numero`), e só
+   ele: sobrancelha e rodapé ficam iguais.
+2. O número é **curto**: acima de mil vira notação compacta ("1,2 mil"), e o
+   "R$" vai menor, antes do número, fora dele.
+3. O rodapé quebra em até duas linhas (`line-clamp-2`) em vez de truncar no
+   meio da palavra.
+
+Um cartão de valor que tem detalhe (a lista por trás do número) vira o próprio
+botão: `.interativo` no cartão inteiro, e o rodapé diz "toque para ver". O
+detalhe abre numa `<Folha>`.
+
+**Número que precisa de explicação ganha a explicação na tela**, numa linha
+`t3 txt-xs` logo abaixo da fileira — nunca só num ⓘ. Se a pessoa pergunta "o
+que é isso?", a resposta tinha de estar ali. Unidades diferentes (pedidos e
+minutos) nunca somam num número só.
+
+### 8.30 "Ao vivo" sem botão de atualizar
+
+Tela de acompanhamento não tem botão "Atualizar": ela lê de novo sozinha
+(a cada ~20 s com a aba à vista, e na hora em que a aba volta a ficar visível
+ou a internet volta). O cabeçalho mostra um ponto de `--sucesso` pulsando e
+"Ao vivo · 10:08"; em erro, o ponto vira `--aviso` e os dados antigos ficam na
+tela com uma `<Nota>` em cima — nunca uma tela em branco.
+
+Assinatura em tempo real do banco só serve quando as regras de acesso deixam
+quem olha ver as linhas de todo mundo; se o acesso é por linha do próprio
+usuário, a leitura periódica pelo servidor é o caminho.
+
 ## 9. Moldura e navegação
 
 ### 9.1 A casca
@@ -2587,6 +2695,22 @@ não rola, então nada gruda e a navegação sobe junto com a página. Use
 **Preferência não fica na navegação.** Tema, idioma e contraste moram em
 ajustes. A coluna é para ir a lugares; um interruptor no meio dela é um item de
 menu que não navega, e vira o primeiro lugar onde todo mundo clica por engano.
+
+### 9.5-b Ferramenta de bastidor: ícone, não item
+
+Tela que só uma parte das contas vê (administração, depuração) **não entra na
+lista da navegação**: ali ela disputa espaço com as telas do produto e confunde
+quem estiver olhando por cima do ombro. Ela vira um ícone de canto:
+
+- Desktop: no pé da barra lateral, junto dos ícones utilitários (atalhos,
+  recolher), à esquerda deles.
+- Celular: no cabeçalho da tela inicial, junto dos ícones redondos.
+- Com a tela aberta, o ícone do pé da barra fica **aceso** — fundo
+  `--acento-solido`, ícone em `--acento-solido-texto` — que é o mesmo sinal de
+  "você está aqui" dos itens da navegação. Sem isso, a única tela sem nenhum
+  item marcado é justamente ela.
+- Esconder o ícone é conveniência; quem protege a tela é o servidor (a rota
+  responde "não encontrado" para quem não tem acesso).
 
 ### 9.6 Navegação — celular
 
@@ -3031,6 +3155,14 @@ gente.
   "visão geral".
 - **Vazio convida**: diga o que aparece ali quando houver algo, e ofereça o
   primeiro passo.
+- **Um verbo por ação, e sempre o mesmo.** O que tira algo da vista precisa
+  dizer se tem volta:
+  - **Excluir** — vai para a lixeira e volta dentro do prazo. Não pergunta
+    "tem certeza?": o aviso depois traz **Desfazer**.
+  - **Apagar para sempre** — definitivo. Esse sim pergunta antes.
+  - **Descartar** — o que nunca chegou a ser salvo (rascunho, gravação).
+  - **Remover** — tira de um lugar sem destruir (um anexo, uma marcação, dos
+    favoritos).
 - **O código também fala português.** Componentes, props e classes CSS têm nomes
   em português (`Botao`, `variante`, `.cartao`, `--fundo`). É o que mantém o
   vocabulário do produto e o do código na mesma língua.
@@ -3170,6 +3302,11 @@ Antes de dar uma tela por pronta:
 - [ ] A tela registrou a sua ação principal, e não criou um "+" próprio.
 - [ ] Cartão de valor: um por linha no celular, e o mesmo degrau de número em
       todos os cartões da tela.
+- [ ] Números que somam um total aparecem como distribuição (§8.26), não
+      como barras soltas; número que pede explicação traz a explicação na tela.
+- [ ] Lista longa com busca usa filtro e ordem em quadrados que abrem folha
+      (§8.27), com a linha de resumo dizendo o que está valendo.
+- [ ] Tela de acompanhamento se atualiza sozinha, sem botão (§8.30).
 - [ ] Escolha (campo, dropdown, aba, filtro, passo de mês) usa o raio de campo;
       a pílula é de chip, badge, botão de ícone, navegação e segmentado.
 - [ ] Filtro tem a casca do vizinho da linha — mesma superfície e mesma moldura
