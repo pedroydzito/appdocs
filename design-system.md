@@ -1543,7 +1543,7 @@ errada, e agora dá para saber qual.
 ### 8.1 Botão
 
 ```tsx
-<Botao variante="primario|superficie|fantasma|perigo" tamanho="p|m|g" largo carregando />
+<Botao variante="primario|superficie|fantasma|perigo|invertido" tamanho="p|m|g" largo carregando />
 <BotaoLink href="…" />   // mesma cara, mas navega
 <BotaoIcone rotulo="…" /> // quadrado, rótulo acessível OBRIGATÓRIO
 ```
@@ -1558,6 +1558,7 @@ primario:   bg-[var(--acento-solido)] text-[var(--acento-solido-texto)]
 superficie: superficie-2 text-[var(--texto)]
 fantasma:   text-[var(--texto-2)] hover:text-[var(--texto)]
 perigo:     bg-[var(--perigo)] text-[var(--perigo-texto)]
+invertido:  bg-[var(--texto)] text-[var(--fundo)]   // preto no claro, branco no escuro
 
 p: h-9  px-3 txt-sm  gap-1.5
 m: h-11 px-4 text-sm gap-2
