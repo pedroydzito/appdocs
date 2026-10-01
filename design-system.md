@@ -1744,6 +1744,13 @@ lugar num quadro. É o deslize que conta de onde para onde se foi.
   rolagem), com `ResizeObserver` no pai e nos filhos.
 - Transição: `transform, width, height, background-color` em `--tempo-normal`.
 - `instantaneo` desliga o deslize, para onde outro movimento já conta a história.
+- **Antes da primeira medida, o item ativo pinta o próprio fundo.** Na tela que
+  vem pronta do servidor, o JavaScript ainda não mediu nada, e o item ativo já
+  nasce com o texto na cor de cima do fundo — claro sobre nada, por um segundo.
+  O contêiner ganha `data-trilho-pronto` num `useLayoutEffect` ligado à
+  existência da medida (no mesmo quadro em que o fundo medido aparece); até lá,
+  `.trilho-sem-medida:not([data-trilho-pronto]) > [aria-pressed="true"]` pinta o
+  fundo no próprio item.
 
 ### 8.6 TrocaPainel
 
@@ -3100,6 +3107,34 @@ A exceção legítima é o **backup**: ele é arquivo de restauração, não de 
 e um backup que perde conteúdo não restaura nada. Diga isso no comentário, para
 ninguém "corrigir" depois.
 
+### 10.9 A primeira abertura mostra uma camada por vez
+
+A conta nova abre com boas-vindas — e cada peça que "aparece uma vez" (termos,
+dica, convite para instalar, confirmar e-mail) decide sozinha que a hora é
+agora. No app de referência, a folha de termos da IA abria **por cima** das
+boas-vindas, falando de um recurso que a conta grátis nem tem.
+
+- Peça que só vale para quem tem um recurso (termos de um recurso pago) só
+  aparece para quem tem — ou na primeira vez que a pessoa usa o recurso.
+- Duas folhas modais nunca ao mesmo tempo. Dicas e avisos não modais podem
+  conviver, com teto (duas) e fila.
+- Folha com ✕ fecha no ✕. Um `aoFechar` que não faz nada deixa um botão morto
+  na tela; se a folha não pode ser dispensada, ela não mostra o ✕.
+
+### 10.10 Valor de sistema não aparece como se fosse da pessoa
+
+Dois casos do mesmo erro:
+
+- **Marcador guardado no lugar do conteúdo.** Um item só de áudio é gravado com
+  "Áudio aguardando transcrição." no campo do texto. No editor, isso aparecia
+  como texto que a pessoa escreveu — e, sem o plano que transcreve, como uma
+  promessa que nunca vem. O editor mostra o campo vazio, com o convite para
+  escrever; o que ela digitar substitui o marcador.
+- **Valor padrão que não foi escolha.** O banco exige uma emoção e grava
+  `neutro` quando a pessoa pula o passo. A lista já dizia "sem humor"; o
+  cabeçalho do detalhe dizia "NEUTRO" — e, logo abaixo, a mesma tela pedia para
+  escolher. Onde existe a marca de "não escolhido", todos os lugares a leem.
+
 ---
 
 ## 11. Gestos
@@ -3136,7 +3171,15 @@ Piso, não aspiração:
 - **Alvo de toque** de 44px.
 - **Cor nunca é o único sinal**: o nome está escrito ao lado do pontinho.
 - **`alt`** descritivo nas imagens de conteúdo, `alt=""` nas decorativas.
-- **Erro** anunciado com `role="alert"`.
+- **Erro** anunciado com `role="alert"` — e escrito na tela. Um erro que é só
+  animação (os pontos do PIN tremem em vermelho por 0,7 s) não diz nada a quem
+  não estava olhando, nem ao leitor de tela: o texto da instrução vira "PIN
+  errado. Tente de novo." até o próximo dígito, num `role="status"`.
+- **Dois controles diferentes nunca têm o mesmo nome.** O botão que abre a lista
+  de telas da navegação e o menu de ações de um item chamavam-se ambos "Mais
+  opções" — para o leitor de tela, o mesmo botão duas vezes. Nomeie pelo que faz
+  ("Mais telas").
+- **Botão que abre e fecha um menu** tem `aria-expanded`.
 - **Alto contraste** como modificador combinável, não como tema à parte.
 - **Zoom do iOS**: campo com `font-size: max(16px, 1em)`.
 

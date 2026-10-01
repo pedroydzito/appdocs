@@ -455,6 +455,38 @@ outra, esperando zero linhas. Ele roda no CI, em job separado, depois do resto
 passar (§12). É o único teste que prova a promessa central do produto, e o único
 que não dá para deduzir lendo o código.
 
+### 6.4 O que roda "ao entrar" roda também na abertura
+
+Baixar o PIN da conta, registrar o acesso, ler o plano — trabalho de "quando a
+pessoa entra" costuma ficar no evento de login do cliente (`SIGNED_IN`). Esse
+evento só acontece quando o login é feito **pelo navegador** (e-mail e senha).
+Quem entra pelo Google, por link mágico ou por qualquer callback do servidor
+volta com a sessão já no cookie, e o cliente recebe **`INITIAL_SESSION`** — o
+trabalho nunca roda. Num aparelho já logado também não: o PIN criado noutro
+aparelho nunca desce.
+
+- O que é **estado da conta que o aparelho espelha** (PIN, preferências) roda em
+  `INITIAL_SESSION` também — é uma leitura só, e pode ser a mesma da abertura
+  (desempenho §4.17).
+- O que é **registro de login** (auditoria) continua só no `SIGNED_IN`.
+- A tela que depende desse estado (a tranca) precisa **ouvir** quando ele
+  muda, e não só ler na montagem: o PIN chega um instante depois de ela montar.
+
+### 6.5 "Não consegui ler" não é "não tem"
+
+A leitura que traz um estado de segurança (o PIN) falhou por rede? **Não mexa no
+que está no aparelho.** Gravar "sem PIN" a partir de uma leitura que falhou abre
+o app destrancado justamente quando ele é aberto sem internet. Só uma resposta
+bem-sucedida dizendo "não há PIN" apaga o local.
+
+### 6.6 Recurso pago: plano antes do aceite
+
+Quando um recurso pago exige um aceite (termos de enviar dados a um serviço de
+IA), confira o **plano primeiro**. Na ordem inversa, a conta grátis recebe a
+folha de termos de um envio de dados que nunca vai acontecer e, depois de
+aceitar, "assine". E a folha de aceite não abre sozinha na primeira abertura de
+quem não tem o plano — ainda mais por cima das boas-vindas.
+
 ---
 
 ## 7. Banco de dados e migrações
@@ -583,8 +615,8 @@ O que dói:
 
 ## 12. Integração contínua
 
-Um workflow no push para `main` e em todo pull request, com cancelamento do
-anterior no mesmo branch. Os passos, nesta ordem (o mais barato primeiro):
+Um workflow em todo pull request, com cancelamento do anterior no mesmo branch.
+Os passos, nesta ordem (o mais barato primeiro):
 
 1. `typecheck`
 2. `lint` — **com teto de avisos** (`--max-warnings N`). Teto é o que impede a
@@ -595,10 +627,41 @@ anterior no mesmo branch. Os passos, nesta ordem (o mais barato primeiro):
    o pré-render das páginas que criam o cliente do backend falha
 6. `conferir:bundle` — o orçamento de tamanho
 
-E um **job separado**, depois do primeiro passar, para o teste de isolamento
-entre contas (§6.3). Ele só roda no repositório de origem: um pull request de
-fork não recebe segredos, e falharia por falta de chave, não por falha de
-isolamento.
+7. o teste de isolamento entre contas (§6.3)
+8. a conferência de que o código e o banco batem (§7.2)
+9. a auditoria de dependências (`npm audit --audit-level=high --omit=dev`), com
+   `continue-on-error`: uma falha publicada num pacote de terceiro não pode
+   travar um conserto urgente
+
+Os passos 7 e 8 precisam de segredos e só rodam no repositório de origem (`if:`
+no passo): um pull request de fork não recebe segredos, e falharia por falta de
+chave, não por falha de isolamento.
+
+**Um job só, e só no pull request.** Três cuidados que, juntos, cortaram mais da
+metade dos minutos cobrados no app de referência:
+
+- **Cada job é cobrado arredondado para cima e refaz o `npm ci`.** Três jobs
+  (verificar, isolamento, dependências) eram três instalações e três
+  arredondamentos — dois deles gastando um minuto inteiro para rodar trinta
+  segundos. Como passos de um job só, eles ainda rodam depois de o resto passar.
+- **Não rode de novo no push para `main`.** O pull request já roda contra o
+  resultado do merge (`refs/pull/N/merge`), e o merge com commit de merge não
+  muda o código. Rodar tudo outra vez depois era pagar duas vezes pela mesma
+  conferência. Deixe `workflow_dispatch` para rodar à mão quando alguém
+  empurrar direto para `main`.
+- **Mudança só de documentação não dispara nada** (`paths-ignore: ["**/*.md",
+"docs/**"]`). Só funciona se nenhum check for obrigatório na proteção do
+  branch — um check obrigatório que não roda trava o merge.
+
+```yaml
+on:
+  pull_request:
+    paths-ignore: ["**/*.md", "docs/**"]
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
 
 ### 12.1 "Preciso mesmo disso? Meus outros projetos só têm o repo e a Vercel."
 
@@ -760,6 +823,26 @@ da entrada — nunca o conteúdo. "Não consegui ler esse arquivo" na tela, sem 
 motivo no log, é um bug que só se investiga reproduzindo, e às vezes não se
 reproduz.
 
+### 15.1 Varrer o app com uma conta descartável
+
+Testar fluxos de escrita (criar, excluir, restaurar, tranca, gravação) na conta
+de alguém mexe no diário dessa pessoa e gasta a cota dela. Use uma conta só
+para isso:
+
+1. Crie pela chave de serviço, com o e-mail já confirmado
+   (`auth.admin.createUser({ email, email_confirm: true })`).
+2. Para ter a sessão sem senha: `auth.admin.generateLink({ type: "magiclink" })`
+   e, com a chave pública, `verifyOtp({ token_hash, type: "magiclink" })`. A
+   sessão que volta vai num cookie no formato do pacote de servidor
+   (`sb-<projeto>-auth-token`, `base64-` + JSON em base64url, em pedaços de
+   ~3180 caracteres).
+3. Rode o navegador automatizado com esse cookie, colhendo `console.error`,
+   `pageerror` e respostas ≥ 400 de cada tela. Em modo de desenvolvimento os
+   avisos de hidratação vêm com o trecho divergente; em produção, só o número.
+4. Para gravação de voz: `--use-fake-ui-for-media-stream
+--use-fake-device-for-media-stream` no Chromium.
+5. **Apague a conta no fim**, com tudo (§17.3).
+
 ---
 
 ## 16. Segredos e troca de chaves
@@ -853,6 +936,35 @@ Duas outras coisas que essa janela costuma esquecer:
   registro. Quem escreve de madrugada, ou data o item para ontem, recebia o dia
   errado impresso.
 
+### 17.3 Apagar a conta de outra pessoa (painel de administração)
+
+O mesmo que apagar a linha em Authentication no painel do Supabase — e mais o
+que essa linha não leva junto. Na ordem:
+
+1. **Os arquivos.** O Storage não apaga em cascata: liste cada balde sob
+   `<id da conta>/` (descendo nas pastas, paginando de 100 em 100) e remova.
+   Vão primeiro porque, depois de apagar a conta, ninguém mais sabe de quem
+   eram.
+2. **O que a cascata só desvincula.** Tabela com `on delete set null` (relatos
+   de erro, por exemplo) perde o vínculo mas fica; apague essas linhas à mão.
+3. **A conta.** `auth.admin.deleteUser(id)`; a cascata leva as tabelas do app.
+
+Pare no primeiro passo que falhar e diga qual: uma conta ainda inteira é melhor
+que uma conta apagada com arquivos sem dono. Nunca apague a própria conta de
+quem está apagando, nem a de outro administrador. E confira o que a cascata
+cobre, em vez de supor:
+
+```sql
+select c.relname, a.attname, con.confdeltype  -- c = cascade, n = set null
+from pg_constraint con
+join pg_class c on c.oid = con.conrelid
+join pg_attribute a on a.attrelid = con.conrelid and a.attnum = any(con.conkey)
+where con.contype = 'f' and con.confrelid = 'auth.users'::regclass;
+```
+
+(Pelo `information_schema` a chave para outro schema não aparece: a consulta
+volta vazia e parece que nada tem cascata.)
+
 ---
 
 ## 18. Checklist de lançamento
@@ -870,7 +982,12 @@ Duas outras coisas que essa janela costuma esquecer:
 - [ ] Service worker registrado só em produção, com versão e página offline.
 - [ ] Instalado no celular: ícone certo, sem barra de navegador, áreas seguras
       respeitadas, funciona em modo avião.
-- [ ] CI verde nos seis passos, orçamento de bundle dentro do teto — por rota.
+- [ ] CI verde (um job, só no pull request, §12), orçamento de bundle dentro do
+      teto — por rota.
+- [ ] O estado da conta que o aparelho espelha (PIN) desce também na abertura,
+      e uma leitura que falhou não apaga o que está no aparelho (§6.4, §6.5).
+- [ ] Apagar uma conta (pela própria pessoa ou pelo admin) leva os arquivos dos
+      baldes e o que a cascata só desvincularia (§17.3).
 - [ ] Exportação legível respeita o que a interface diz estar protegido; o
       backup vai inteiro, e os dois motivos estão em comentário (§17.1).
 - [ ] HTML montado à mão escapa o texto puro que entra nele (§17.2).

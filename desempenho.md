@@ -111,6 +111,63 @@ dependência nenhuma, e é o que segura o app leve por anos.
 
 ---
 
+### 2.4 Um idioma por pacote
+
+Um app traduzido costuma guardar os textos num objeto por idioma — e importar os
+três de uma vez no provedor de idioma, que mora no layout. Resultado: **toda
+tela baixa os dicionários de todos os idiomas**, e lê um. No app de referência
+eram 286 KB em toda página, dois terços nunca lidos.
+
+> O idioma em uso vem no pacote inicial; os outros são `import()` sob demanda.
+
+Como fazer, sem piscar e sem quebrar a hidratação:
+
+1. **Um arquivo por idioma e por domínio** (`textos/pt/home.ts`,
+   `textos/en/home.ts`…). O tipo sai do idioma-molde: `export const home:
+typeof Molde = {…}` — esquecer uma chave continua sendo erro de compilação.
+   Um objeto `{ pt, en, es }` no mesmo módulo **não** se divide: o bundler não
+   separa propriedades de um objeto em pedaços diferentes.
+2. **O idioma principal** (o da maioria de quem usa) fica estático. Os outros
+   saem num carregador:
+
+   ```ts
+   type Promessa = Promise<Textos> & { status?: "pending" | "fulfilled"; value?: Textos };
+   // ao resolver: promessa.status = "fulfilled"; promessa.value = textos;
+   ```
+
+   A promessa leva `status`/`value` no formato que o `use()` do React lê: um
+   dicionário já baixado devolve na hora, sem suspender.
+
+3. **O provedor chama `use()` sempre, no mesmo lugar.** Na hidratação, com o
+   idioma do servidor ainda descendo, ele suspende e o HTML do servidor fica na
+   tela até chegar. Depois da hidratação, idioma novo ainda não baixado mostra o
+   anterior e troca quando chega. Chamar `use()` só às vezes faz o React
+   estranhar a ordem dos hooks quando o pacote chega no meio (erro 467).
+4. **Comece a baixar antes do React.** No topo do módulo do provedor, leia o
+   `<html lang>` e dispare o `import()` do idioma — o pedido sai junto com o
+   resto, e não depois da hidratação.
+5. **Trocar de idioma baixa antes de trocar.** A tela muda de uma vez, inteira.
+6. **Texto que também é DADO** (um marcador gravado no banco que precisa ser
+   reconhecido nos três idiomas) sai do dicionário para um módulo pequeno
+   próprio. Senão, quem precisa dele importa os três dicionários por três frases.
+7. **Um teste trava o vazamento:** varre o código e falha se um módulo de
+   cliente importar o agregador com todos os idiomas. Bastava uma importação
+   errada para os três voltarem ao pacote sem erro nenhum.
+
+Fora do React (avisos disparados por callback, código de gravação), use uma
+função `textosAtuais()` que devolve o idioma em uso se já estiver baixado, e o
+principal enquanto não.
+
+### 2.5 O layout baixa todo componente de cliente que importa
+
+Medido no Next com Turbopack: os componentes de cliente importados pelo layout
+raiz entram nos scripts da página **mesmo quando aquela renderização não os
+desenha**. Uma página pública que esconde a navegação ainda baixa a navegação.
+
+Consequência prática: "três provedores, o servidor escolhe um" **não economiza
+nada** — os três descem. Para que um pedaço só desça quando usado, ele precisa
+ser `import()` (§3), não um componente escolhido pelo servidor.
+
 ## 3. Carregar código sob demanda
 
 Regra: **o que não aparece na primeira tela não entra no primeiro download.**
@@ -476,6 +533,107 @@ espelho. É a mesma família de §4.9 (respostas fora de ordem), mas o sintoma �
 pior: não é uma tela desatualizada por um instante, é trabalho pago feito duas
 vezes.
 
+### 4.14 A primeira tela já vem com dado do servidor
+
+Com cache, espelho local e tudo o mais, a tela inicial ainda segue esta ordem
+na abertura: HTML com esqueleto → JavaScript baixa → React monta → o banco local
+responde → a lista aparece. Medido: primeira pintura em ~1 s e o primeiro
+cartão em 2 a 3 s, **com tudo já no aparelho**. O maior elemento da tela (o
+LCP) é o texto do primeiro cartão, e ele espera tudo isso.
+
+> A primeira página da lista vai no HTML. O cliente reconcilia depois.
+
+As regras que fazem isso não virar um problema:
+
+- **Só na abertura de um documento.** Confira `Sec-Fetch-Dest: document` e que
+  não é um pedido RSC (`RSC: 1`). Na navegação dentro do app a lista já está na
+  memória — consultar o banco em cada volta para a tela inicial seria o
+  contrário de rápido.
+- **Nunca para o service worker.** O `fetch` do pré-cache não é `document`; com a
+  regra acima ele recebe a casca vazia. Uma casca com a lista de alguém dentro
+  mostraria essa lista a quem entrasse depois no mesmo aparelho.
+- **Prazo curto.** A consulta tem ~800 ms; passou, o HTML segue sem ela e o
+  cliente busca sozinho, como antes. Com o servidor na mesma região do banco,
+  ela leva dezenas de milissegundos.
+- **Sessão sem rede.** A conferência do login usa as chaves públicas embutidas
+  (§11.7); senão a primeira renderização de cada servidor frio vai buscá-las.
+- **Semente enxuta.** O que vai no HTML é o que o cartão desenha: texto longo
+  vira prévia (com a contagem de palavras do inteiro, para o rótulo não mudar),
+  resumo só com a seção que o cartão mostra, nada de campos que só a tela de
+  detalhe lê. No app de referência: 36 KB comprimidos para 20 itens.
+- **A semente não entra no cache nem no espelho.** Ela segura a tela até a lista
+  completa chegar e sai na primeira resposta — **mesmo que a resposta seja "nada
+  mudou"** (a comparação de §4.8 é desligada enquanto a tela mostra semente).
+- **Uma vez por documento.** Voltar pelo histórico remonta a tela com as mesmas
+  props da primeira abertura; a essa altura o cache tem a lista de verdade. Marque
+  "semente usada" num efeito (o servidor não roda efeitos, e o Strict Mode chama
+  o inicializador duas vezes).
+- **Tudo o que depende do aparelho precisa bater com o servidor** — fuso, lista
+  compacta, filtros guardados, medidas. Ver §6.8 a §6.10.
+
+Resultado medido em produção, no celular: LCP de 3,3–3,6 s para 1,3–1,6 s.
+
+### 4.15 O dado do servidor não perde para o que é mais velho
+
+A ordem natural do cliente é "mostra o espelho local, confere com a rede". Com
+a semente do servidor na tela, o espelho só pode ser **mais velho**: ele não
+tem o item escrito no computador há um minuto. Trocar a semente pelo espelho
+fazia esse item sumir por um instante, até a rede responder.
+
+> Com dado do servidor na tela, pule o espelho. Só a rede substitui.
+
+### 4.16 Voltar ao app confere — o tempo real não reenvia o que perdeu
+
+No celular, o app em segundo plano perde o canal de tempo real (WebSocket), e o
+que mudou enquanto isso — um item criado noutro aparelho — **não é reenviado**
+quando ele reconecta. A pessoa volta e vê a lista de antes, e o item novo só
+aparece ao recarregar.
+
+```ts
+let saiuEm = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    saiuEm = Date.now();
+    return;
+  }
+  if (!saiuEm || Date.now() - saiuEm < 15_000 || !navigator.onLine) return;
+  saiuEm = 0;
+  void recarregar({ forcar: true });
+});
+```
+
+Quinze segundos separam "olhei uma notificação" de "fiquei fora". Com §4.8, se
+nada mudou, nada pisca. Vale para toda tela que lista algo, não só a inicial.
+
+### 4.17 Quem pergunta junto recebe a mesma resposta
+
+Na abertura, três peças independentes perguntam a mesma linha (o perfil: termos
+aceitos, preferência, PIN), e duas perguntam o mesmo endpoint (o plano). Cada
+uma com a sua ida à rede, no caminho crítico.
+
+> Junte as perguntas iguais: a mesma promessa para quem pergunta enquanto ela
+> está no ar, e a mesma resposta por alguns segundos depois.
+
+```ts
+let guardada: { em: number; promessa: Promise<Resposta> } | null = null;
+export function lerPerfil(): Promise<Resposta> {
+  if (guardada && Date.now() - guardada.em < 10_000) return guardada.promessa;
+  const promessa = buscar().then((r) => {
+    if (r.error && guardada?.promessa === promessa) guardada = null; // erro não fica
+    return r;
+  });
+  guardada = { em: Date.now(), promessa };
+  return promessa;
+}
+export function esquecerPerfil() {
+  guardada = null;
+} // quem grava chama
+```
+
+Três regras: **erro não fica guardado** (a próxima pergunta tenta de novo),
+**quem grava esquece** (senão a leitura seguinte devolve o que acabou de mudar),
+e o prazo é curto (5–10 s): é para juntar a abertura, não para virar cache.
+
 ## 5. Listas longas
 
 ### 5.1 Virtualizar
@@ -597,6 +755,125 @@ O efeito custa um render a mais em toda montagem, e o linter o conta como
 aviso. O cuidado é a hidratação: `lerLocais` precisa devolver no servidor o
 mesmo que o primeiro quadro do cliente mostra — o que decide o que aparece é
 uma bandeira `pronto` que nasce falsa dos dois lados.
+
+### 6.8 Hidratação: o que só o aparelho sabe entra depois
+
+Quando o servidor desenha a tela (§4.14), tudo o que o primeiro render do
+cliente lê do aparelho — `localStorage`, `sessionStorage`, IndexedDB, medidas —
+precisa **ser igual ao servidor durante a hidratação**. Se não for, o React joga
+fora o HTML e desenha tudo de novo (erro 418): o ganho de vir pronto some, e a
+tela pisca.
+
+```ts
+const nada = () => () => {};
+/** false enquanto hidrata; true em todo o resto, inclusive navegação no cliente. */
+export function useHidratado() {
+  return useSyncExternalStore(
+    nada,
+    () => true,
+    () => false,
+  );
+}
+```
+
+O padrão para estado guardado no aparelho:
+
+```ts
+const hidratando = !useHidratado();
+const [valor, setValor] = useState(() => (hidratando ? padrao : lerGuardado()));
+const leu = useRef(!hidratando);
+useLayoutEffect(() => {
+  // antes da pintura: nenhum quadro com o valor errado
+  if (leu.current) return;
+  leu.current = true;
+  const g = lerGuardado();
+  if (g !== undefined) setValor(g);
+}, []);
+```
+
+- Fora da hidratação (toda tela aberta por navegação) o guardado é lido no
+  primeiro render, como sempre.
+- **A primeira gravação espera a leitura**: sem isso, o valor padrão da
+  hidratação é escrito por cima da escolha da pessoa.
+- O que muda o desenho da tela inteira (lista em cartões ou em linhas) vale
+  **também num cookie**, para o servidor desenhar já do jeito certo — senão a
+  tela vem em cartões e vira lista um segundo depois.
+
+Outros três que quebram a hidratação sem parecer:
+
+- **Lista virtualizada**: o servidor não tem janela para medir. Durante a
+  hidratação, desenhe os itens em fluxo normal, com as mesmas chaves; o
+  virtualizador assume logo depois, sobre os mesmos nós.
+- **Animação de entrada** ligada por efeito: a tela que veio pronta já está
+  pintada quando o React acorda. Animar a entrada agora faz o conteúdo sumir e
+  voltar. Marque a tela que veio do servidor e pule a animação dela.
+- **Idioma**: o servidor desenha no idioma do cookie; o cliente hidrata nele, e
+  só depois passa ao idioma guardado no aparelho (§2.4).
+
+### 6.9 Datas no relógio de quem lê
+
+"Hoje", "Ontem" e "21:40" dependem do fuso e do dia de quem lê; o servidor roda
+em UTC. Sem cuidado, o HTML diz um dia e o navegador outro.
+
+1. O cliente grava o fuso num cookie (`Intl.DateTimeFormat().resolvedOptions().timeZone`).
+2. O servidor só desenha com dado quando há fuso válido (o cookie é texto de
+   qualquer um: confira com `new Intl.DateTimeFormat("en", { timeZone })`
+   dentro de `try`). Sem cookie, a primeira visita abre como antes.
+3. O servidor passa `{ fuso, agora }` por contexto; durante a hidratação as
+   datas saem desse relógio, e depois, do aparelho — o mesmo texto, porque o
+   fuso é o mesmo.
+
+Para formatar num fuso qualquer, em qualquer ambiente, leve o instante ao
+**relógio de parede** do fuso e formate o resultado como data local:
+
+```ts
+function noRelogioDe(iso: string, fuso: string): Date {
+  const p = new Intl.DateTimeFormat("en-US", {
+    timeZone: fuso,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(iso));
+  const v = (t: string) => Number(p.find((x) => x.type === t)?.value ?? 0);
+  return new Date(v("year"), v("month") - 1, v("day"), v("hour") % 24, v("minute"), v("second"));
+}
+```
+
+"Hoje" é comparar o dia de `noRelogioDe(item)` com o de `noRelogioDe(agora)` —
+não chame `isToday()`, que usa o relógio de quem roda o código.
+
+### 6.10 Peça medida por JavaScript: pinte a versão sem medida
+
+Um indicador posicionado por medida (o fundo que desliza até a opção escolhida
+num seletor) só existe depois de o JavaScript medir. Na tela que vem pronta do
+servidor, a opção escolhida nasce com o texto claro — e fica um segundo **clara
+sobre nada**.
+
+> Até a medida existir, o próprio elemento escolhido pinta o fundo. O indicador
+> medido assume no mesmo quadro em que aparece.
+
+```css
+.seletor:not([data-medido]) > [aria-pressed="true"] {
+  background: var(--texto);
+}
+```
+
+O componente que mede marca o contêiner (`data-medido`) num `useLayoutEffect`
+ligado à existência da medida — no mesmo commit em que o indicador entra, e
+portanto na mesma pintura. Num `useEffect` comum haveria um quadro sem nenhum
+dos dois.
+
+### 6.11 Compilador automático: meça antes de manter
+
+Ligar um compilador que memoiza tudo sozinho (o React Compiler) parece ganho
+grátis. Medido no app de referência: o pacote **cresceu**, e as telas grandes —
+justamente as que mais precisavam — foram puladas pelo compilador por usarem
+padrões que ele não aceita. Foi revertido. Ligue, rode `conferir:bundle` e o
+perfil das telas pesadas, e só mantenha se os números melhorarem.
 
 ## 7. Adiar, esperar e cancelar
 
@@ -805,6 +1082,42 @@ export function useEmCurso(id: string) {
 - Com o resultado na tela, uma bandeira `pendente` que ficou ligada (a lista
   atrasada de §4.13) **só se limpa** — não dispara nada.
 
+### 7.9 A marca de "desmontado" precisa voltar a falso ao montar
+
+Um padrão comum para não ligar o microfone depois que a tela saiu:
+
+```ts
+const desmontado = useRef(false);
+useEffect(
+  () => () => {
+    desmontado.current = true;
+  },
+  [],
+);
+// ...
+const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+if (desmontado.current) {
+  stream.getTracks().forEach((t) => t.stop());
+  return;
+}
+```
+
+O defeito: o React desmonta e monta **o mesmo componente** sem recriar a ref — o
+Strict Mode faz isso no desenvolvimento, e o `<Activity>` faz em produção ao
+esconder e mostrar uma tela. O `true` da limpeza fica para sempre, e o botão
+de gravar passa a não fazer nada, sem erro nenhum.
+
+```ts
+useEffect(() => {
+  desmontado.current = false; // (re)montou
+  return () => {
+    desmontado.current = true;
+  };
+}, []);
+```
+
+Procure no projeto todo por refs que a limpeza liga e nada religa.
+
 ## 8. Offline-first
 
 Três camadas, e cada uma resolve uma coisa:
@@ -838,12 +1151,17 @@ Detalhes que evitam dor:
   promessa de rede continua correndo e, ao falhar, vira `unhandled rejection`
   dentro do service worker. Marque-a como tratada (`daRede.catch(() => {})`)
   logo depois de criá-la.
-- **Nunca guarde uma resposta `redirected`.** Sem sessão, o servidor desvia para
-  a tela de entrar; o `fetch` da navegação SEGUE o desvio, e o que chega no
-  worker é um 200 com o HTML do login e `resposta.ok` verdadeiro. Guardar isso
-  sob a chave da rota pedida faz o app abrir na tela de entrar **mesmo depois de
-  entrar**, e ninguém liga uma coisa na outra. A condição é
-  `resposta.ok && !resposta.redirected`, e ela vale para toda gravação de HTML.
+- **Nunca guarde uma resposta `redirected` — e nunca a devolva para a navegação.**
+  Sem sessão, o servidor desvia para a tela de entrar; o `fetch` da navegação
+  SEGUE o desvio, e o que chega no worker é um 200 com o HTML do login e
+  `resposta.ok` verdadeiro. Guardar isso sob a chave da rota pedida faz o app
+  abrir na tela de entrar mesmo depois de entrar. Devolver essa resposta (ou a
+  `opaqueredirect` do desvio manual) faz o Chrome e o Safari recusarem a
+  página: "não é possível acessar esse site", e na tentativa seguinte carrega.
+  Grave só com `resposta.ok && !resposta.redirected`. Para a navegação, não
+  devolva o desvio: sirva o corpo sem a marca, ou uma página mínima que faz
+  `location.replace` para a URL final (um 302 sintético quebra cookie
+  `SameSite` numa navegação que nasceu fora do site).
 - **Pré-carregue** as rotas principais e uma página de "sem conexão".
 - Sirva o próprio arquivo do service worker com `Cache-Control: no-store`.
 - **Registre só em produção, e no primeiro OCIOSO — não no `load`.** Instalar o
@@ -1153,12 +1471,36 @@ intercepta) caía no servidor, que não sabe o que fazer com ele.
   worker inteiro.
 - **Dado de outra versão é entrada não confiável.** Valide o formato antes de
   mexer; descarte o que não reconhecer.
-- **Nunca guarde resposta com `redirected: true`.** Sem sessão, o servidor
-  desvia para o login e o `fetch` do pré-cache segue o desvio — e guarda o HTML
-  do login debaixo da chave da rota. O navegador recusa resposta desviada numa
-  navegação, e mostra `ERR_FAILED` sem uma palavra sobre service worker.
+- **Nunca guarde resposta com `redirected: true`, e nunca a devolva para a
+  navegação.** Sem sessão, o servidor desvia para o login e o `fetch` segue o
+  desvio. Guardar o HTML do login debaixo da chave da rota, ou devolver essa
+  resposta (ou uma `opaqueredirect`) para a navegação, faz o navegador recusar
+  a página com `ERR_FAILED`. Sirva o corpo sem a marca, ou uma página que
+  navega sozinha até o destino.
 - **Deixe a medição passar direto** (`/_vercel/`, ou o caminho do seu RUM):
   medição servida do cache mede a versão de ontem.
+
+### 8.8 Uma casca por TIPO de rota, e a tela lê o endereço
+
+Offline, recarregar `/item/<id>` não tem cópia guardada daquele id. O fácil é
+servir a casca da tela inicial — e é o que quebra: o HTML desenha a lista, o
+roteador do cliente lê o endereço e desenha o item, e o React descarta tudo
+(418) no meio da abertura offline.
+
+- Guarde a casca de **uma amostra** de cada rota variável (`/item/casca`,
+  `/pessoa/casca`), e sirva-a para qualquer id daquela rota. O HTML dela é o
+  esqueleto, igual para todos.
+- A tela precisa ler o id do **endereço**, não da árvore do servidor:
+  `useParams()` devolve o que veio dentro do HTML guardado ("casca"), e a tela
+  procura o item "casca". Leia de `usePathname()` — mas só depois da
+  hidratação (§6.8); durante ela, use o mesmo valor do servidor.
+
+### 8.9 O pré-cache só pede o que existe
+
+Uma rota na lista de pré-cache que não tem página sem parâmetro (`/tags` quando
+só existe `/tags/[tag]`) dá 404 em toda instalação do worker: banda e tempo de
+instalação gastos à toa, sem aviso nenhum. Confira a lista contra as rotas
+reais sempre que uma tela mudar de lugar.
 
 ## 9. Imagens
 
@@ -1406,6 +1748,41 @@ esperando uma navegação que não vem — e o indicador passa a mentir.
 
 ---
 
+### 11.6 Rede cara: pré-aquecer menos
+
+Baixar com antecedência o que a pessoa provavelmente vai abrir (§11.4) é ótimo
+no Wi-Fi e caro no plano de dados. Medido no app de referência: **42 MB** de
+áudio antigo baixados ao abrir, no 4G.
+
+```ts
+const conexao = (navigator as { connection?: { saveData?: boolean; type?: string } }).connection;
+const poupa = conexao?.saveData === true;
+const movel = conexao?.type === "cellular";
+const limite = poupa ? 0 : movel ? 5 : 15; // mídias pré-aquecidas
+```
+
+A API não existe no Safari: sem ela, trate como desconhecido (o meio-termo),
+não como Wi-Fi.
+
+### 11.7 Conferir o login sem ir à rede
+
+A conferência do token no servidor (`getClaims` no Supabase) valida a assinatura
+com as **chaves públicas** do projeto — e, sem elas em mãos, cada servidor frio
+vai buscá-las (`/.well-known/jwks.json`) antes de responder. No app de
+referência: 17 idas em hora e meia, cada uma somada à espera de quem abriu o app.
+
+As chaves são públicas por definição: embuta-as no código e passe-as na chamada.
+Se a chave girar, o `kid` novo não estará lá e a biblioteca busca a lista atual
+sozinha — esquecer de atualizar custa só a ida de antes. O mesmo vale para o
+middleware e para as rotas que conferem sessão.
+
+### 11.8 A tela que pergunta sozinha: etiqueta e 304
+
+Um painel que se atualiza a cada 20 segundos quase sempre recebe a mesma
+resposta. Calcule uma etiqueta do conteúdo (sem o carimbo de hora) e devolva
+`304` sem corpo quando o navegador mandar a mesma em `If-None-Match`. A tela
+trata o 304 como "nada mudou" e não redesenha nada (§4.8).
+
 ## 12. Banco de dados
 
 ### 12.1 Nunca `select("*")`
@@ -1447,6 +1824,37 @@ tolerância a coluna ausente e o `join` certo. Componente que fala direto com o
 banco é onde o N+1 nasce.
 
 ---
+
+### 12.5 A função que devolve a linha inteira
+
+Uma função do banco declarada como `returns setof tabela` monta a **linha
+inteira** — inclusive o vetor de 768 números, o histórico e o texto bruto —
+antes de a API projetar as poucas colunas que a tela pediu. O `select` do
+cliente não alcança dentro da função.
+
+Mantenha a assinatura (quem chama não muda) e devolva `null` nas colunas
+pesadas que a lista nunca lê. Detalhe que derruba a função: o `null` do vetor
+precisa do tipo exato (`null::vector(768)`), senão o Postgres recusa o retorno
+por não bater com a coluna.
+
+### 12.6 Cada índice e cada publicação custam em toda escrita
+
+- **Índice sem leitura** é trabalho em toda gravação: dois índices de vetor
+  sobre a mesma coluna atualizam dois grafos a cada item salvo. Confira em
+  `pg_stat_user_indexes` (`idx_scan = 0` depois de semanas de uso) e apague.
+- **Tabela na publicação de tempo real** que ninguém assina é decodificada do
+  log a cada mudança, para ninguém.
+- **Assinatura de tempo real sem filtro** recebe as mudanças de todo mundo e
+  descarta no cliente. Filtre pela conta no próprio canal.
+
+### 12.7 Some no banco, não no cliente
+
+Um painel que baixava **todas** as linhas da tabela principal (conta, data,
+origem) a cada 20 segundos para somar em JavaScript tinha uma resposta que
+crescia com o uso de todo mundo. Uma função que devolve as somas já agrupadas
+(por conta, tipo e mês, com os cortes de 7 e 30 dias calculados lá) troca
+milhares de linhas por dezenas. Só a chave de serviço executa: é leitura de
+todas as contas.
 
 ## 13. Observabilidade
 
@@ -1490,6 +1898,11 @@ O maior custo de INP de um app assim. Três camadas:
    2,5s; 1,2s de `setTimeout` onde não houver `requestIdleCallback`). Quem só
    veio ler nunca paga o editor.
 3. Salvamento automático com 1200ms de espera.
+4. **Extensão duplicada vale a primeira.** Kits como o `StarterKit` do Tiptap 3
+   já trazem `link` e `underline`; registrar os seus também gera o aviso de nome
+   duplicado, e quem vale é a cópia do kit — que abre o link ao clicar e aceita
+   qualquer protocolo. Desligue no kit (`StarterKit.configure({ link: false,
+underline: false })`) o que você configura à parte.
 
 ### 14.2 Gravação de voz
 
@@ -1632,6 +2045,24 @@ Antes de dar uma tela por pronta:
 - [ ] Chamada de IA que volta vazia registra o `finishReason`, tenta de novo, e
       não é confundida com "não há nada" (§14.6).
 
+**Abertura e hidratação**
+
+- [ ] A tela inicial abre com a primeira página no HTML (só em abertura de
+      documento, com prazo curto, semente enxuta, nunca na casca do worker) — §4.14
+- [ ] Com dado do servidor na tela, o espelho local não o substitui — §4.15
+- [ ] Voltar ao app depois de ~15 s fora confere a lista — §4.16
+- [ ] Perguntas iguais da abertura saem numa ida só (em voo + alguns segundos) — §4.17
+- [ ] Só o idioma em uso vem no pacote inicial; um teste trava o vazamento — §2.4
+- [ ] Nada que lê o aparelho muda o primeiro render da hidratação (`useHidratado`,
+      leitura em `useLayoutEffect`, cookie para o que muda a tela inteira) — §6.8
+- [ ] Datas desenhadas no servidor usam o fuso de quem lê — §6.9
+- [ ] Peça posicionada por medida tem versão sem medida — §6.10
+- [ ] Ref de "desmontado" volta a falso ao montar — §7.9
+- [ ] Rota variável offline usa a casca da mesma rota e lê o id do endereço — §8.8
+- [ ] Pré-aquecimento de mídia respeita `saveData` e rede móvel — §11.6
+- [ ] Chaves públicas do login embutidas — §11.7
+- [ ] Função do banco que devolve linha inteira não monta colunas pesadas — §12.5
+
 ---
 
 ## 16. Diagnóstico: "o meu app demora para carregar as telas"
@@ -1684,6 +2115,20 @@ muda depois e a foto fica em branco até recarregar. Reagende com espera
 dobrando.
 
 **7. Só então**: profile de render, memoização, workers.
+
+### A primeira pintura é rápida, mas o conteúdo chega 1–2 s depois
+
+O FCP é bom e o LCP é ruim: o HTML chega cedo com o esqueleto, e o primeiro
+cartão espera JavaScript, hidratação e o banco local. Meça qual elemento é o LCP
+(`PerformanceObserver` com `largest-contentful-paint`, `buffered: true`) — se for
+o texto do primeiro item da lista, o remédio é a semente do servidor (§4.14), e
+não cache, que já está fazendo o melhor que pode.
+
+### O item escrito noutro aparelho só aparece ao recarregar
+
+Não é cache: é o tempo real que caiu em segundo plano e não reenviou o que
+perdeu (§4.16), ou um passo do cliente trocando dado fresco do servidor por
+espelho local (§4.15).
 
 ### O erro de método mais comum
 
