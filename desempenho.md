@@ -430,8 +430,6 @@ useEffect(() => {
 O sintoma real disso: ao entrar numa tela cujo painel é dinâmico, dois diálogos
 fechados apareciam por meio segundo e sumiam.
 
----
-
 ### 4.11 A lista pesada não bloqueia a casca
 
 Um layout que busca dados para toda a árvore acaba esperando pela **maior** das
@@ -634,6 +632,98 @@ Três regras: **erro não fica guardado** (a próxima pergunta tenta de novo),
 **quem grava esquece** (senão a leitura seguinte devolve o que acabou de mudar),
 e o prazo é curto (5–10 s): é para juntar a abertura, não para virar cache.
 
+### 4.18 Toda tela pinta o aparelho primeiro, e a rede troca depois
+
+Medido num 4G lento simulado (1,6 Mbps, 150 ms de latência), as telas que
+esperavam a rede antes de pintar levavam de 4 a 7 segundos até o primeiro
+conteúdo — e mais de 15 nas que faziam duas consultas em fila. As que liam o
+aparelho primeiro abriam em menos de um segundo, com os mesmos dados.
+
+| Tela                            | Antes  | Depois |
+| ------------------------------- | ------ | ------ |
+| Calendário                      | 5,9 s  | 0,6 s  |
+| Destaques                       | 6,6 s  | 0,9 s  |
+| Galeria                         | 4,1 s  | 0,7 s  |
+| Padrões                         | 4,5 s  | 1,0 s  |
+| Lista filtrada por etiqueta     | 7,1 s  | 0,9 s  |
+| Lista de pessoas                | > 15 s | 3,2 s  |
+| Lixeira (só existe no servidor) | > 15 s | 6,8 s  |
+
+A regra, para todo hook que carrega uma coleção ou um item:
+
+1. Já há algo **em memória** (o cache de módulo, §4.1)? Pinte e siga.
+2. Não há? **Leia o banco local antes de qualquer pedido** e pinte o que vier,
+   desligando o esqueleto.
+3. Só então pergunte à rede, e troque o que está na tela quando a resposta
+   chegar (sem piscar o que não mudou, §4.8).
+
+O passo 2 é o que costuma faltar: o cache em memória cobre a navegação dentro da
+sessão, mas a **primeira** abertura de cada tela depois de abrir o app não tem
+nada em memória, e era ela que ficava no esqueleto esperando o 4G.
+
+### 4.19 A lista que veio do aparelho é marcada, e tenta de novo sozinha
+
+O defeito que esta regra corrige: depois de dias usando o app instalado, a
+pessoa abre o site no navegador do mesmo celular. A tela inicial mostra "quatro
+dias sem escrever" — o banco local daquele navegador estava parado havia quatro
+dias. A busca na rede falhou calada no 4G, a lista caiu no aparelho, **e foi
+guardada no cache como se fosse fresca**. Nada tentava de novo; só recarregar a
+página consertava.
+
+- **Marque a origem.** Quando a camada de dados devolve uma lista lida do
+  aparelho por falta de rede (offline, sem sessão, erro, prazo estourado),
+  marque o próprio array com um `Symbol` não enumerável
+  (`Object.defineProperty(lista, ORIGEM_APARELHO, { value: true })`) e exponha
+  `veioDoAparelho(lista)`. O array continua sendo um array para todo o resto
+  do código.
+- **Lista do aparelho entra no cache como velha** (`em: 0`), para a próxima
+  leitura não confiar nela.
+- **E agenda nova tentativa**: 4 s, 10 s, 25 s, 60 s (e depois a cada 60 s),
+  **só com a aba visível e o aparelho online**, e também no evento `online`.
+  Quando uma resposta da rede chega, zera a contagem e troca a lista.
+- **A busca principal tem prazo** (10 s): sem ele, o pedido pendurado no 4G
+  nunca caía para o aparelho nem disparava a nova tentativa.
+
+Assim a tela continua abrindo na hora com o que há no aparelho, e se corrige
+sozinha segundos depois — sem a pessoa saber que houve problema.
+
+### 4.20 Consultas independentes saem juntas, cada uma com prazo
+
+Uma tela que faz duas consultas **em fila**, cada uma com prazo de 6 s, pode
+levar 12 s no pior caso. A lista de pessoas fazia isso: a lista, e depois a
+contagem de menções (só para ordenar). Disparar a segunda **antes** de esperar a
+primeira levou o pior caso de 12,6 s para 3,2 s.
+
+- Dispare o pedido acessório primeiro (`const pedido = comPrazo(...)` sem
+  `await`), faça o principal, e só então `await pedido`.
+- Cada um tem o **seu** prazo e a **sua** queda: se a contagem não vier, a lista
+  aparece com a ordem do aparelho, não some.
+- Envolva o construtor de consulta em `Promise.resolve(...)` antes de passar a um
+  `Promise.race`: alguns clientes (PostgREST) só disparam o pedido quando alguém
+  chama `.then`, e o prazo nunca começaria a contar.
+- A tela que depende só do servidor (a lixeira) também ganha prazo, e ao estourar
+  mostra o **último retrato guardado** em vez de uma lista vazia.
+
+### 4.21 Uma leitura por aba para o que várias peças pedem
+
+Na mesma tela, quatro listas pediam as fotos das pessoas cada uma por si. Um
+`Promise` guardado no módulo resolve isso: a primeira peça dispara a leitura,
+as outras recebem a mesma promessa, e uma falha limpa o guardado para a próxima
+tentar de novo.
+
+```ts
+let pedido: Promise<Map<string, string | null>> | null = null;
+function lerFotos() {
+  pedido ??= carregar().catch(() => {
+    pedido = null;
+    return new Map();
+  });
+  return pedido;
+}
+```
+
+---
+
 ## 5. Listas longas
 
 ### 5.1 Virtualizar
@@ -725,8 +815,6 @@ trabalho.
 Quando uma lista se reordena, meça a posição antes e depois, aplique a inversão
 sem transição e devolva ao normal em uma transição de `transform`. Animar
 `width`/`top` recalcula layout a cada quadro; `transform` não.
-
----
 
 ### 6.6 Animação que termina não pode deixar camada
 
@@ -875,6 +963,27 @@ justamente as que mais precisavam — foram puladas pelo compilador por usarem
 padrões que ele não aceita. Foi revertido. Ligue, rode `conferir:bundle` e o
 perfil das telas pesadas, e só mantenha se os números melhorarem.
 
+### 6.12 Seções compridas só custam quando aparecem
+
+`content-visibility: auto` deixa o navegador **pular layout e pintura** do que
+está fora da tela. Vale para seções longas e pesadas (gráfico, grade de meses,
+mapa de constância) calculadas hoje mesmo quando ninguém rolou até lá.
+
+```css
+.secao-longa {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+```
+
+`contain-intrinsic-size` é obrigatório junto: sem ele a seção não pintada vale
+altura zero, a barra de rolagem encolhe e a página pula quando a seção entra. O
+valor é uma estimativa — errar não quebra nada, só faz a rolagem se ajustar um
+pouco ao chegar lá. Não use em seção que tem âncora de rolagem nem em algo que a
+busca do navegador precisa achar sem rolar.
+
+---
+
 ## 7. Adiar, esperar e cancelar
 
 ### 7.1 Ocioso
@@ -1006,8 +1115,6 @@ do `useEffect` não alcança o que ainda não tinha nascido quando ela rodou.
 Vale igual para `MediaRecorder` (parar o gravador, não só as trilhas),
 `AudioContext` (fechar), `WakeLock` (liberar) e handles do sistema de arquivos.
 
----
-
 ### 7.7 O app "recarrega" quando a pessoa volta para ele
 
 Sintoma: a pessoa sai do app, atende uma mensagem, volta — e a tela remonta do
@@ -1117,6 +1224,38 @@ useEffect(() => {
 ```
 
 Procure no projeto todo por refs que a limpeza liga e nada religa.
+
+### 7.10 Trabalho longo no celular: guarde tudo antes, e marque que começou
+
+No Android, o sistema descarta a página de um app que ficou alguns minutos em
+segundo plano. Uma leitura de seis áudios (transcrever um por um) que levava
+minutos era cortada no meio quando a pessoa saía para outro app — e, na volta, a
+tela se montava do zero a partir da lista de arquivos compartilhados, como se
+nada tivesse começado. Pior: um segundo toque em "ler" criava outro rascunho com
+os mesmos áudios.
+
+- **Guarde todos os arquivos antes de processar o primeiro.** Guardar no banco
+  local é rápido; transcrever é lento. Com a leva inteira guardada, um corte no
+  meio não perde nada.
+- **Marque que a leva virou o rascunho X** (no `localStorage`, com validade igual
+  à da lista de compartilhados). Na volta, se a marca existe e o rascunho tem os
+  arquivos, **esvazie a lista** e retome o rascunho — os itens já processados vêm
+  do que ficou anotado neles, sem gastar rede nem cota. Limpe a marca ao
+  terminar, ao guardar para depois, e quando chegar um compartilhamento novo.
+- **Falha com a tela escondida não é falha.** O Android corta a rede de quem não
+  está na tela. Se algo falhou enquanto `document.visibilityState` era
+  `hidden`, tente de novo sozinho no `visibilitychange` de volta — só o que
+  falhou.
+- **A lista de entrada se limpa do que já foi guardado.** Os arquivos que estão
+  num rascunho (mesmo nome e mesmo tamanho) saem da lista ao abrir a tela, e um
+  botão tira todos de uma vez: a lista vale horas (para juntar recados com calma),
+  e sem isso o que já foi lido voltava a cada abertura.
+- **O passo seguinte é o mesmo de qualquer caminho.** O rascunho retomado guarda
+  o texto cru (`texto === textoBruto`) e passa pelo mesmo pós-processamento de
+  uma gravação (marcar pessoas, perguntar quem é quem, corrigir) — corrigir no
+  meio do caminho fazia o rascunho pular etapas.
+
+---
 
 ## 8. Offline-first
 
@@ -1746,8 +1885,6 @@ Só acenda a barra quando o toque **de fato troca de rota**. Se ele apenas fecha
 um painel ou volta uma etapa dentro da mesma tela, a barra fica pendurada
 esperando uma navegação que não vem — e o indicador passa a mentir.
 
----
-
 ### 11.6 Rede cara: pré-aquecer menos
 
 Baixar com antecedência o que a pessoa provavelmente vai abrir (§11.4) é ótimo
@@ -1782,6 +1919,31 @@ Um painel que se atualiza a cada 20 segundos quase sempre recebe a mesma
 resposta. Calcule uma etiqueta do conteúdo (sem o carimbo de hora) e devolva
 `304` sem corpo quando o navegador mandar a mesma em `If-None-Match`. A tela
 trata o 304 como "nada mudou" e não redesenha nada (§4.8).
+
+### 11.9 Meça no 4G ruim, não no wi-fi do escritório
+
+Tudo abre rápido no wi-fi. O que importa é o celular na rua. Uma varredura de
+desempenho por tela, automatizada:
+
+- **Navegador de teste com a rede estrangulada pelo protocolo de depuração**
+  (CDP `Network.emulateNetworkConditions`): **1,6 Mbps de descida, 750 kbps de
+  subida, 150 ms de latência** reproduz um 4G fraco; para ações (salvar, enviar
+  arquivo), 200 kB/s e 90 kB/s.
+- **Mede-se o "tempo até o conteúdo"**, não o `load`: o instante em que o
+  primeiro elemento real da tela aparece (o primeiro cartão, o primeiro dia do
+  calendário), com um seletor por rota.
+- **Conta-se os pedidos de API e de banco** de cada tela junto com o tempo: uma
+  tela que demora e faz sete pedidos tem um problema diferente da que demora com
+  um.
+- **O byte de JavaScript medido com o service worker ativo mente** (ele serve do
+  cache): para medir o pacote de verdade, desligue o worker na sessão de teste.
+- Rode **duas vezes**: a primeira abertura (sem nada em memória nem no banco
+  local) e a volta (com tudo). As duas precisam ser boas; é a primeira que quase
+  sempre esqueceram (§4.18).
+- Repita depois de cada mudança de carregamento e guarde a tabela antes/depois
+  no PR — "ficou mais rápido" sem número não é medição.
+
+---
 
 ## 12. Banco de dados
 

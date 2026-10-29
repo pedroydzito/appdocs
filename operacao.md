@@ -422,6 +422,62 @@ subir de verdade.
 Teste isto a cada release, no aparelho, com o modo avião ligado: abrir o app,
 criar algo, fechar o app, religar a rede, conferir que subiu.
 
+### 5.1 Rede fraca: o caso que mais quebra
+
+O offline completo costuma estar bem coberto. O que quebra de verdade é o
+meio-termo: o aparelho diz "online", o pedido sai e falha no meio, demora
+minutos ou nunca volta (4G ruim, troca de rede, wi-fi de portal). Seis regras
+para todo código novo:
+
+1. **Toda escrita confere o erro.** Cliente de banco que devolve `{ error }` em
+   vez de lançar falha calado se ninguém ler.
+2. **Todo pedido que a pessoa espera tem prazo.** Leitura: ~6s, e aí vale o que
+   está no aparelho. Escrita e IA: o teto da rota mais uma folga para o envio
+   (um áudio grande conta o tamanho: ~40 KB/s de envio).
+3. **Falha de rede no meio é o caso offline chegando atrasado.** O tratamento é
+   o mesmo: fila, rascunho, arquivo guardado — nunca só um erro na tela com o
+   conteúdo jogado fora.
+4. **Repetir não pode duplicar.** O que vai para a fila depois de uma tentativa
+   que talvez tenha chegado usa o **mesmo id** (o conflito de chave vira "já
+   subiu").
+5. **Estado mudado no aparelho não é desfeito pelo servidor** enquanto não
+   tiver subido: marque como pendente, e na leitura o pendente manda (um PIN
+   removido sem rede não pode voltar na abertura seguinte).
+6. **Passos em sequência gravam o novo antes de apagar o velho.** Apagar e
+   depois inserir perde tudo se a rede cair entre os dois.
+
+E a fila não pode depender só do evento "online": com o aparelho "online" e o
+servidor inalcançável, ela tenta de novo em espera crescente (20s, 40s, 80s…
+até 5 min) e a cada volta ao app. Operação longa em várias etapas (juntar dois
+registros, mover muitos itens) guarda uma marca de "em andamento" no aparelho e
+é **retomada** pelo sincronizador se for cortada no meio.
+
+### 5.2 O que só existia no aparelho vai para a nuvem
+
+Faça a varredura uma vez por projeto: **tudo o que a pessoa criou e que vive só
+no banco local some ao desinstalar o app, limpar os dados ou trocar de
+aparelho** — e o navegador do computador nunca vê. Conversas, preferências que
+ela considera "minhas", marcas de "já vi esta dica". O padrão para trazer uma
+coleção para a nuvem sem perder o offline:
+
+- A cópia local continua sendo a que responde na hora; a tabela na nuvem é a
+  que sobrevive. Toda mudança grava no aparelho com `pendente: true` e tenta
+  subir.
+- A sincronização tem três passos, nesta ordem: apaga na nuvem o que foi
+  apagado aqui (uma lista de ids guardada até subir), sobe o que está pendente
+  (e só limpa o `pendente` se o item não mudou de novo enquanto subia — compare
+  o carimbo `atualizadoEm`), e baixa o que mudou em outro aparelho (ganha o
+  carimbo mais novo; o pendente local nunca é sobrescrito).
+- Um item que **já esteve na nuvem** (`naNuvem`) e sumiu de lá foi apagado em
+  outro aparelho: sai daqui também.
+- Os itens de antes da sincronização existir (sem `naNuvem`) contam como
+  pendentes: é assim que eles chegam à nuvem na primeira abertura.
+- **Sem a tabela** (migração ainda não aplicada), tudo segue só no aparelho,
+  sem erro na tela — o código vai para produção antes da migração sem quebrar.
+- **No logout, a cópia local sai junto** (depois de uma última sincronização;
+  se sobrou algo que não subiu, pergunte antes). Deixar conversas de uma conta
+  no aparelho para a próxima pessoa que entrar é vazamento.
+
 ---
 
 ## 6. Login e isolamento de dados
@@ -776,9 +832,29 @@ impressão.
 
 ## 14. Versão e release
 
-- **Versione a cada commit** que vai para `main`, no `package.json`: `+0.0.1`
-  para ajuste e correção, `+0.1.0` para um conjunto de mudanças ou recurso
-  grande, `+1.0.0` para o que muda o núcleo do app.
+- **Versione a cada commit** que vai para `main`, no `package.json`, e **cada
+  número tem teto** — uma versão como `3.35.16` não diz nada a ninguém:
+  - **Z (0 a 99)** — atualização pequena: ajuste, correção, recurso menor. Soma 1
+    (`4.0.0` → `4.0.1` → … → `4.0.99`).
+  - **Y (0 a 9)** — atualização grande, que mexe em bastante coisa. Soma 1 e zera
+    o Z (`4.0.37` → `4.1.0`). Também é o que acontece quando o Z passaria de 99.
+  - **X** — quando o Y passaria de 9 (`4.9.x` → `5.0.0`), ou numa mudança no
+    núcleo do app. Zera Y e Z.
+  - Ao adotar a regra num projeto que já tem números grandes, junte a série
+    inteira numa versão redonda (`3.35.x` → `4.0.0`) e some as notas dela numa
+    só.
+- **Toda versão tem nota de novidades, e o teste cobra.** No mesmo commit que
+  muda a versão, a entrada dela vai para o **topo** da lista de novidades que o
+  app mostra, em todos os idiomas. Um teste falha se a primeira versão da lista
+  não for a do `package.json`: "Você está na versão X" sem nota é defeito.
+  Escreva na língua de quem usa, não na do commit — a tela pelo nome inteiro, o
+  que a pessoa nota, sem nome de arquivo nem de técnica. Mudança que a pessoa
+  não vê (banco, tela de administração, segurança, refatoração) entra como uma
+  frase geral ("Correções de design e experiência do usuário."), nunca nomeando
+  tela confidencial.
+- **Uma correção não ganha versão própria se ainda não foi publicada**: dois
+  commits no mesmo PR podem subir dois números, mas uma reversão antes do merge
+  apaga o commit (no próprio ramo), em vez de virar um terceiro número.
 - **Mostre a versão no app** (rodapé dos ajustes, ou da barra lateral). É o que
   transforma "está esquisito aqui" em um relato utilizável.
 - **Uma fonte da verdade, cobrada no build.** A versão que a interface mostra sai
@@ -792,6 +868,13 @@ impressão.
   efeito e não o arquivo tocado.
 - Decisão de arquitetura que você vai ter que defender de novo em seis meses
   vira um ADR curto em `docs/adr/` — contexto, decisão, consequência.
+- **Atualização de biblioteca não entra por estar disponível.** O robô de
+  dependências abre PRs sozinho; um PR dele com o CI vermelho, ou que pula uma
+  versão maior (ícones 0.x → 1.x, player de áudio 7 → 8), **não** é mergeado
+  "para ficar em dia". Com o app estável, o ganho de uma versão nova costuma ser
+  invisível e o risco é real (a biblioteca de ícones 1.x tirou os ícones de
+  marca; um player novo muda eventos). Atualize de propósito, num PR seu, com o
+  fluxo afetado testado no aparelho — e feche os do robô que ficaram velhos.
 
 ---
 
