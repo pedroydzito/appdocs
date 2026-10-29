@@ -204,45 +204,68 @@ Duas decisões que parecem erradas e não são:
 
 ### 3.3 Os quatro temas, por inteiro
 
+Os blocos abaixo são cópia fiel do CSS do app (sem os comentários e sem as
+cores de categoria, que estão em §3.4). Copie-os inteiros: cada valor foi
+conferido contra o teste de contraste.
+
 **Claro** — papel quente, não branco puro. Branco puro em tela cheia cansa a
 vista e é o que dá ar de template genérico.
 
 ```css
 :root {
+  --seguro-top: max(env(safe-area-inset-top, 0px), var(--casca-topo, 0px));
+  --seguro-bottom: max(env(safe-area-inset-bottom, 0px), var(--casca-base, 0px));
   --fundo: #f5f4f0;
   --superficie: #fffefb;
   --superficie-2: #eceae3;
   --superficie-3: #e2dfd6;
+  --superficie-hover: #f5f3ee;
   --borda: #e0ddd4;
   --borda-forte: #cdc9bd;
+  --trancado: #e0ddd4;
   --texto: #16130f;
   --texto-2: #4a453e;
   --texto-3: #6b645b;
-
+  --altura-nav: 5.5rem;
   --sombra-baixa: 0 1px 2px rgb(22 19 15 / 0.04);
   --sombra: 0 1px 2px rgb(22 19 15 / 0.04), 0 4px 16px -6px rgb(22 19 15 / 0.08);
   --sombra-alta: 0 2px 4px rgb(22 19 15 / 0.05), 0 12px 32px -8px rgb(22 19 15 / 0.16);
-
   --perigo: #f43a2b;
   --perigo-tenue: rgb(244 58 43 / 0.1);
-  --perigo-texto: #ffffff;
   --sucesso: #0f7a52;
   --sucesso-tenue: rgb(15 122 82 / 0.1);
   --aviso: #9a5b12;
   --aviso-tenue: rgb(154 91 18 / 0.1);
   --favorito: #b87a14;
   --link: #1f5fd0;
-
-  --veu-hover: rgb(0 0 0 / 0.055);
+  --veu-hover: rgb(0 0 0 / 0.035);
   --veu-ativo: rgb(0 0 0 / 0.09);
-
   --acento-solido: #f43a2b;
   --acento-solido-texto: #ffffff;
-  --acento-texto: #b9190c;
+  --acento-texto: var(--color-acento-500);
+  --perigo-texto: #ffffff;
   --anel-foco: rgb(244 58 43 / 0.4);
-
   --sobre-emocao: #ffffff;
-  --chip-tinta: 5%;
+  --chip-tinta: 15%;
+  --largura-conteudo: 48rem;
+  --largura-leitura: 68ch;
+  --raio-p: 0.5rem;
+  --raio-m: 0.75rem;
+  --raio-g: 1rem;
+  --raio-cartao: 1.25rem;
+  --raio-pilula: 999px;
+  --veu-midia: rgb(0 0 0 / 0.5);
+  --veu-midia-forte: rgb(0 0 0 / 0.7);
+  --veu-solta: color-mix(in srgb, var(--fundo) 88%, transparent);
+  --z-avisos: 70;
+  --z-folha: 80;
+  --z-visor: 90;
+  --z-tranca: 100;
+  --z-folha-tranca: 110;
+  --tempo-rapido: 150ms;
+  --tempo-normal: 280ms;
+  --curva: cubic-bezier(0.22, 1, 0.36, 1);
+  --curva-saida: cubic-bezier(0.4, 0, 1, 1);
 }
 ```
 
@@ -254,16 +277,16 @@ vista e é o que dá ar de template genérico.
   --superficie: #141414;
   --superficie-2: #1c1c1c;
   --superficie-3: #262626;
+  --superficie-hover: #191919;
   --borda: #242424;
   --borda-forte: #363636;
+  --trancado: #242424;
   --texto: #fafaf9;
   --texto-2: #b8b5b0;
   --texto-3: #8b8781;
-
   --sombra-baixa: 0 1px 2px rgb(0 0 0 / 0.3);
   --sombra: 0 1px 2px rgb(0 0 0 / 0.4);
   --sombra-alta: 0 12px 32px -8px rgb(0 0 0 / 0.6);
-
   --perigo-tenue: rgb(244 58 43 / 0.16);
   --sucesso: #4ade9b;
   --sucesso-tenue: rgb(74 222 155 / 0.14);
@@ -271,12 +294,9 @@ vista e é o que dá ar de template genérico.
   --aviso-tenue: rgb(224 164 88 / 0.14);
   --favorito: #f5c451;
   --link: #7cb2ff;
-
-  /* No escuro o véu é BRANCO: a superfície clareia ao receber o ponteiro. */
-  --veu-hover: rgb(255 255 255 / 0.07);
+  --veu-hover: rgb(255 255 255 / 0.05);
   --veu-ativo: rgb(255 255 255 / 0.11);
-
-  --acento-texto: #f55b4f;
+  --acento-texto: var(--color-acento-500);
   --anel-foco: rgb(244 58 43 / 0.5);
   --sobre-emocao: #000000;
 }
@@ -301,51 +321,83 @@ atrapalha quem depende desse modo.
   --superficie: #ffffff;
   --superficie-2: #ededed;
   --superficie-3: #dcdcdc;
+  --superficie-hover: #ededed;
   --borda: #767676;
   --borda-forte: #1a1a1a;
+  --trancado: #ededed;
   --texto: #000000;
   --texto-2: #1f1f1f;
   --texto-3: #3d3d3d;
-
-  /* A escala INTEIRA vira cinza — assim `bg-acento-500/10` e qualquer
-     utilidade do Tailwind acompanham de graça, porque no v4 elas compilam
-     para var(--color-acento-*) e não para o hexadecimal cru. */
+  --color-acento-50: #f7f7f7;
+  --color-acento-100: #ededed;
+  --color-acento-200: #d6d6d6;
+  --color-acento-300: #b8b8b8;
+  --color-acento-400: #949494;
   --color-acento-500: #4d4d4d;
+  --color-acento-600: #333333;
   --color-acento-700: #1a1a1a;
-  /* … os onze degraus, de #f7f7f7 a #000000 … */
-
+  --color-acento-800: #0d0d0d;
+  --color-acento-900: #050505;
+  --color-acento-950: #000000;
   --acento-solido: #000000;
   --acento-solido-texto: #ffffff;
   --acento-texto: #000000;
   --perigo: #000000;
+  --perigo-tenue: rgb(0 0 0 / 0.08);
+  --perigo-texto: #ffffff;
   --sucesso: #000000;
+  --sucesso-tenue: rgb(0 0 0 / 0.08);
   --aviso: #000000;
+  --aviso-tenue: rgb(0 0 0 / 0.08);
   --favorito: #000000;
   --link: #000000;
   --veu-hover: rgb(0 0 0 / 0.12);
   --veu-ativo: rgb(0 0 0 / 0.2);
   --anel-foco: rgb(0 0 0 / 0.75);
+  --sobre-emocao: #ffffff;
 }
+```
 
+```css
 .dark.contraste-alto {
   --fundo: #000000;
   --superficie: #0d0d0d;
   --superficie-2: #1f1f1f;
   --superficie-3: #2e2e2e;
+  --superficie-hover: var(--superficie-2);
   --borda: #8f8f8f;
+  --trancado: #1f1f1f;
   --borda-forte: #ffffff;
   --texto: #ffffff;
   --texto-2: #ededed;
   --texto-3: #c9c9c9;
-
-  /* O botão primário se INVERTE: fundo branco, rótulo preto. É o oposto do
-     fundo da página, e é isso que o faz saltar sem depender de matiz. */
+  --color-acento-50: #0d0d0d;
+  --color-acento-100: #1a1a1a;
+  --color-acento-200: #333333;
+  --color-acento-300: #4d4d4d;
+  --color-acento-400: #737373;
+  --color-acento-500: #a6a6a6;
+  --color-acento-600: #c2c2c2;
+  --color-acento-700: #d9d9d9;
+  --color-acento-800: #ececec;
+  --color-acento-900: #f7f7f7;
+  --color-acento-950: #ffffff;
   --acento-solido: #ffffff;
   --acento-solido-texto: #000000;
   --acento-texto: #ffffff;
+  --perigo: #ffffff;
+  --perigo-tenue: rgb(255 255 255 / 0.12);
+  --perigo-texto: #000000;
+  --sucesso: #ffffff;
+  --sucesso-tenue: rgb(255 255 255 / 0.12);
+  --aviso: #ffffff;
+  --aviso-tenue: rgb(255 255 255 / 0.12);
+  --favorito: #ffffff;
+  --link: #ffffff;
   --veu-hover: rgb(255 255 255 / 0.14);
   --veu-ativo: rgb(255 255 255 / 0.22);
   --anel-foco: rgb(255 255 255 / 0.85);
+  --sobre-emocao: #000000;
 }
 ```
 
@@ -373,6 +425,55 @@ Duas regras aprendidas a duras penas:
   laranja virava marrom no tema claro, e o mesmo chip aparecia numa cor na lista
   e noutra na edição. O tom vivo ficou, com o piso de 3:1 que o teste cobra.
 - **A cor nunca é o único sinal.** O nome está sempre escrito ao lado.
+
+#### Paleta de referência: 30 categorias
+
+A paleta que o app de referência usa para o seu conjunto de categorias (aqui,
+estados de humor). Serve como ponto de partida para qualquer conjunto de até 30
+itens: os tons já passam no piso de 3:1 sobre o chip tingido nos dois temas, e
+os degraus de cinza do alto contraste já vêm espaçados de 4 em 4 no hexadecimal.
+Troque os nomes, mantenha a ordem dos valores.
+
+| Categoria        | Claro     | Escuro    | Alto contraste claro | Alto contraste escuro |
+| ---------------- | --------- | --------- | -------------------- | --------------------- |
+| `feliz`          | `#aa7f07` | `#fbbf24` | `#000000`            | `#ffffff`             |
+| `grato`          | `#fb075b` | `#fb7185` | `#040404`            | `#fbfbfb`             |
+| `animado`        | `#cd6b01` | `#fb923c` | `#080808`            | `#f7f7f7`             |
+| `calmo`          | `#07976a` | `#34d399` | `#0c0c0c`            | `#f3f3f3`             |
+| `orgulhoso`      | `#b45309` | `#f59e0b` | `#101010`            | `#efefef`             |
+| `apaixonado`     | `#e11d74` | `#ff79b0` | `#141414`            | `#ebebeb`             |
+| `esperancoso`    | `#4d7c0f` | `#a3e635` | `#181818`            | `#e7e7e7`             |
+| `aliviado`       | `#0d8a80` | `#5eead4` | `#1c1c1c`            | `#e3e3e3`             |
+| `inspirado`      | `#c026d3` | `#e879f9` | `#202020`            | `#dfdfdf`             |
+| `neutro`         | `#7687a0` | `#94a3b8` | `#242424`            | `#dbdbdb`             |
+| `pensativo`      | `#6f76ff` | `#818cf8` | `#282828`            | `#d7d7d7`             |
+| `saudoso`        | `#b0567a` | `#f0a5c0` | `#2c2c2c`            | `#d3d3d3`             |
+| `confuso`        | `#a28203` | `#fcd34d` | `#303030`            | `#cfcfcf`             |
+| `entediado`      | `#8a7a2e` | `#d4c36a` | `#343434`            | `#cbcbcb`             |
+| `cansado`        | `#8f847c` | `#a1a1aa` | `#383838`            | `#c7c7c7`             |
+| `nostalgico`     | `#4f6db8` | `#93b4f5` | `#3c3c3c`            | `#c3c3c3`             |
+| `triste`         | `#088fc1` | `#38bdf8` | `#404040`            | `#bfbfbf`             |
+| `ansioso`        | `#ae5aff` | `#a855f7` | `#444444`            | `#bbbbbb`             |
+| `assustado`      | `#0e7490` | `#67e8f9` | `#484848`            | `#b7b7b7`             |
+| `sobrecarregado` | `#9b2c2c` | `#f39b8b` | `#4c4c4c`            | `#b3b3b3`             |
+| `frustrado`      | `#d9480f` | `#ff8a5c` | `#505050`            | `#afafaf`             |
+| `irritado`       | `#fd043a` | `#f87171` | `#545454`            | `#ababab`             |
+| `motivado`       | `#15803d` | `#4ade80` | `#565656`            | `#a7a7a7`             |
+| `decepcionado`   | `#7c5fa8` | `#b39ddb` | `#585858`            | `#a3a3a3`             |
+| `enojado`        | `#6b8e23` | `#a3c94a` | `#020202`            | `#f5f5f5`             |
+| `pessimista`     | `#4b5d73` | `#a0b0c4` | `#060606`            | `#f1f1f1`             |
+| `surpreso`       | `#d1307e` | `#ff8fc7` | `#0a0a0a`            | `#ededed`             |
+| `melancolico`    | `#3f5f8a` | `#8fb0dc` | `#0e0e0e`            | `#e9e9e9`             |
+| `confiante`      | `#c05621` | `#fdba74` | `#121212`            | `#e5e5e5`             |
+| `envergonhado`   | `#be4b6c` | `#f9a8c0` | `#161616`            | `#e1e1e1`             |
+
+- Sobre um preenchimento de categoria (o chip escolhido), o texto vai em
+  `--sobre-emocao`: `#ffffff` no claro, `#000000` no escuro, `#ffffff` no alto
+  contraste claro e `#000000` no alto contraste escuro. No claro as trinta cores
+  são escuras; no escuro, claras — um token só evita que cada tela chute.
+- O fundo de um chip tingido leva `--chip-tinta` (**15%**) da cor do texto:
+  `color-mix(in srgb, var(--categoria-x) var(--chip-tinta), transparent)`. Em 5%
+  o fundo some e o chip colorido parecia cinza igual à etiqueta comum.
 
 ### 3.4-b Cor derivada de uma chave
 
@@ -770,10 +871,17 @@ tracejada em volta da janela parece erro de layout.
 --tempo-normal: 280ms; /* trilho, folha, troca de painel */
 --curva: cubic-bezier(0.22, 1, 0.36, 1); /* tudo que ENTRA */
 --curva-saida: cubic-bezier(0.4, 0, 1, 1); /* tudo que SAI */
+--curva-mola: cubic-bezier(0.34, 1.56, 0.64, 1); /* passa um triz e volta */
 ```
 
-Duas durações e duas curvas dão conta de tudo. Antes havia 0.4s, 0.3s e 0.2s
-misturados sem critério.
+Duas durações e duas curvas dão conta de quase tudo. Antes havia 0.4s, 0.3s e
+0.2s misturados sem critério.
+
+A terceira curva, `--curva-mola`, é exceção e não padrão: `--curva` desacelera
+mas nunca ultrapassa o destino; a mola passa um triz e volta. Ela entra onde a
+escolha tem peso e o gesto se repete muito — o encaixe de um fundo arrastado
+(§8.5), a régua de intensidade (§8.32). Numa barra de abas ou numa navegação
+ela viraria enjoo.
 
 ### 6.2 As distâncias
 
@@ -1180,7 +1288,557 @@ Três convenções valem para todas:
 | `vazio-entrando` | `from` opacity: 0; transform: translateY(10px) scale(0.9) | chamado inline / por JS    |
 | `vazio-boiando`  | `50%` transform: translateY(-2px) scale(1.05)             | chamado inline / por JS    |
 
----
+**Acrescentadas depois (telas e peças específicas)**
+
+| `@keyframes`          | Quadros                                                                                                                                                   | Quem usa, e com que atalho                                                                                                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fade-linha`          | `from` opacity: 0 → `to` opacity: 1                                                                                                                       | `.linha-resposta` — `fade-linha 0.4s var(--curva) both` (cada linha de uma resposta que chega aos poucos)                                                                                                                                                             |
+| `varrer-leitura`      | `from` transform: translateY(-100%) → `to` transform: translateY(560%)                                                                                    | `.varredura-leitura::after` — `varrer-leitura 2.4s var(--curva) infinite alternate` (faixa de 18% da altura, degradê do acento 35% → 100%, `box-shadow 0 1px 8px` do acento a 60%: o scanner passando sobre uma foto sendo lida). Sob movimento reduzido a faixa some |
+| `fechar-anel`         | `to` stroke-dashoffset: 0                                                                                                                                 | `.anel-segurar circle` — `fechar-anel 450ms linear forwards` (o anel de segurar, §9.6)                                                                                                                                                                                |
+| `fantasma-abre`       | `from` opacity: 0; transform: scale(1.22) → `to` opacity: 0.3; transform: scale(1)                                                                        | `.ano-fantasma` — `fantasma-abre 1.6s var(--curva) 120ms both` (§6.7)                                                                                                                                                                                                 |
+| `digito-sobe`         | `from` opacity: 0; transform: translate3d(0, 0.5em, 0) rotateX(-70deg) scale(0.9); filter: blur(12px) → `to` opacity: 1; transform: none; filter: blur(0) | `.ano-digito` — `digito-sobe 0.85s var(--curva) both`, `animation-delay: calc(var(--i) * 110ms)` (§6.7)                                                                                                                                                               |
+| `deriva-aurora`       | `from` transform: translate3d(0, 0, 0) scale(1) → `to` transform: translate3d(14%, -12%, 0) scale(1.2)                                                    | `.aurora-ano::before` — `19s ease-in-out infinite alternate`; `.aurora-ano::after` — `24s ease-in-out infinite alternate-reverse` (§6.7)                                                                                                                              |
+| `subir-nova`          | `from` transform: translateY(100%) → `to` transform: none                                                                                                 | a tela de criar entrando por baixo, só no desktop — `subir-nova 420ms var(--curva) backwards`. No celular a subida vinha depois de a tela já ter aparecido, e via-se um fantasma descendo                                                                             |
+| `humor-reage`         | `0%` scale(0.88) · `60%` scale(1.04) · `100%` none                                                                                                        | `.humor-rosto` — `humor-reage 420ms var(--curva) backwards`; reinicia a cada troca de categoria pela `key` do elemento (§8.32)                                                                                                                                        |
+| `cena-entra`          | `from` opacity: 0; transform: translate3d(0, 12%, 0) → `to` opacity: 1; transform: none                                                                   | `.cena-entra` — `cena-entra 0.32s var(--curva) both` (cena de uma sequência em tela cheia, §6.7)                                                                                                                                                                      |
+| `cena-sai`            | `from` opacity: 1; transform: none → `to` opacity: 0; transform: translate3d(0, -8%, 0)                                                                   | `.cena-sai` — `cena-sai 0.2s var(--curva) both`                                                                                                                                                                                                                       |
+| `ponto-acende`        | `from` opacity: 0; transform: scale(0.4)                                                                                                                  | os pontos de uma grade anual quando a cena fica visível (`[data-visivel="1"] .ponto-do-ano`) — `ponto-acende 0.45s var(--curva) backwards`, com atraso escalonado por ponto                                                                                           |
+| `datilografa`         | `from` width: 0 → `to` width: 100%                                                                                                                        | `.datilografa` — `datilografa var(--duracao-datilografa, 2.4s) steps(60, end) both` + `cursor-pisca 0.8s step-end infinite`; `inline-block overflow-hidden whitespace-pre-wrap`, cursor = `border-right: 2px solid` do acento                                         |
+| `cursor-pisca`        | `50%` border-color: transparent                                                                                                                           | junto com `datilografa` (acima)                                                                                                                                                                                                                                       |
+| `preenche-emocao`     | `from` transform: scale(0.4); opacity: 0 → `to` transform: scale(1); opacity: 1                                                                           | `.preenche-emocao` — `preenche-emocao var(--tempo-normal) var(--curva)` (o preenchimento de uma categoria ao ser escolhida)                                                                                                                                           |
+| `entra-barra`         | `from` transform: translateY(calc(100% + 1rem)) → `to` transform: none                                                                                    | `.entra-barra` — `entra-barra 420ms var(--curva)` (barra de ações que sobe do rodapé)                                                                                                                                                                                 |
+| `entrar-parte`        | `from` opacity: 0; transform: translateY(12px) → `to` opacity: 1; transform: none                                                                         | `.entra-conversa > *` — `entrar-parte 380ms var(--curva) both`; 2º filho com 60ms de atraso, do 3º em diante 120ms (cabeçalho, conversa, campo)                                                                                                                       |
+| `onda-vitrine`        | `from` transform: scaleY(0.45) → `to` transform: scaleY(1)                                                                                                | `.onda-vitrine` — `onda-vitrine 1.4s ease-in-out infinite alternate`, `transform-origin: bottom`, `animation-delay: calc(var(--i) * 70ms)` (as barras de uma onda de áudio decorativa respirando em sequência)                                                        |
+| `barra-indeterminada` | `from` transform: translateX(-100%) → `to` transform: translateX(300%)                                                                                    | `.barra-indeterminada` — `barra-indeterminada 1.4s var(--curva) infinite`; sob movimento reduzido para, fica com `width: 100%` e `opacity: 0.5`                                                                                                                       |
+
+### 6.7 Efeitos de classe
+
+Cada um destes é uma classe pronta, com o CSS exato. Todos param sob movimento
+reduzido (o bloco global de `prefers-reduced-motion` zera duração e repetição de
+tudo; os que precisam de um estado final próprio o declaram).
+
+**Etiqueta que responde pelo texto.** O hover de um chip-link não muda o fundo
+(num chip de raio grande e padding curto a mancha parecia cortada nos cantos):
+o texto cresce um fio e vai para o acento. `transform`, e não `font-size`, que
+refluiria a linha e empurraria as vizinhas.
+
+```css
+.tag-link {
+  transition:
+    transform var(--tempo-rapido) var(--curva),
+    color var(--tempo-rapido) var(--curva);
+}
+.tag-link:hover {
+  transform: scale(1.06);
+  color: var(--acento-texto);
+}
+.tag-link:active {
+  transform: scale(0.97);
+}
+```
+
+**O cartão que aquece no toque.** No celular não há hover: entre encostar o dedo
+e a tela trocar há um vão em que nada acontece. O cartão começa a responder no
+`pointerdown` — afunda e clareia — e a classe sai no `pointerup`/`pointercancel`.
+Não promete tempo nenhum: é a diferença entre "não sei se cliquei" e "está indo".
+
+```css
+.aquecendo {
+  transform: scale(0.985);
+  filter: brightness(1.06);
+  transition:
+    transform 400ms var(--curva),
+    filter 400ms var(--curva);
+}
+```
+
+**A cor da categoria vaza para o cartão.** No hover (e no toque), a cor do item
+— escrita pelo componente em `--cor-emocao` — sangra da bolinha para a borda e
+para um brilho no canto de cima. O brilho é um `::before` atrás do conteúdo
+(`isolation: isolate` no cartão, `z-index: -1` no véu): por cima ele tingia os
+chips.
+
+```css
+.tinge-emocao {
+  position: relative;
+  isolation: isolate;
+}
+.tinge-emocao::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--tempo-normal) var(--curva);
+  background-image: radial-gradient(
+    120% 80% at 12% 0%,
+    color-mix(in srgb, var(--cor-emocao, transparent) 22%, transparent),
+    transparent 62%
+  );
+}
+.tinge-emocao:active::before {
+  opacity: 1;
+}
+.tinge-emocao:active {
+  border-color: color-mix(in srgb, var(--cor-emocao, var(--borda-forte)) 45%, var(--borda));
+}
+```
+
+O mesmo princípio num dia de calendário com categoria:
+
+```css
+.dia-calendario-emocao {
+  transition:
+    transform var(--tempo-rapido) var(--curva),
+    box-shadow var(--tempo-rapido) var(--curva);
+}
+```
+
+**O prazo desenhado em volta.** "Some em 5 dias" ganha o anel do próprio prazo:
+um `conic-gradient` preenchido até `--prazo` (0..1) na cor do texto, o resto a
+18%, recortado só na moldura de 2px por máscara.
+
+```css
+.anel-prazo {
+  position: relative;
+  border-radius: var(--raio-pilula);
+}
+.anel-prazo::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background-image: conic-gradient(
+    currentColor calc(var(--prazo, 1) * 360deg),
+    color-mix(in srgb, currentColor 18%, transparent) 0
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+```
+
+**O app ouvindo.** O anel em volta do cartão de gravação respira no volume
+**real** do microfone: `--nivel` (0..1) é escrito por quadro a partir do mesmo
+analisador que desenha a onda. Em silêncio o anel encolhe até quase sumir — é
+assim que se descobre que o microfone não pegou nada antes de falar três
+minutos à toa. 90ms acompanha a voz; 300ms viraria pulsação genérica.
+
+```css
+.eco-voz {
+  box-shadow: 0 0 0 calc(1px + var(--nivel, 0) * 9px)
+    color-mix(in srgb, var(--color-acento-500) calc(18% + var(--nivel, 0) * 34%), transparent);
+  transition: box-shadow 90ms linear;
+}
+```
+
+**A onda pega pelo dedo.** Arrastar sobre a onda procura um trecho do áudio; ela
+engrossa sob o dedo, a partir do centro, que é a linha de base.
+
+```css
+.onda-arrastando {
+  transform: scaleY(1.18);
+  filter: contrast(1.15);
+  transition:
+    transform 140ms var(--curva),
+    filter 140ms var(--curva);
+}
+```
+
+**Esqueleto que vira conteúdo.** Os dois ocupam a mesma célula de grade e se
+cruzam em 180ms: o esqueleto sai (`data-saindo`) enquanto o conteúdo entra
+(`data-entrando`, 6px abaixo), e o olho lê uma coisa só ficando pronta.
+
+```css
+.troca-suave {
+  display: grid;
+}
+.troca-suave > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity 180ms var(--curva),
+    transform 180ms var(--curva);
+}
+.troca-suave > [data-saindo="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+.troca-suave > [data-entrando="true"] {
+  opacity: 0;
+  transform: translateY(6px);
+}
+```
+
+**O ícone do estado vazio segue o ponteiro de longe.** `--px`/`--py` (−1..1) são
+escritos pelo JS a partir da posição do ponteiro na janela; o deslocamento máximo
+é 5px. `translate`, e não `transform`, para não apagar a flutuação de
+`vazio-boiando`, que já anima `transform` — as duas propriedades compõem.
+
+```css
+.icone-vazio {
+  animation:
+    vazio-entrando 460ms var(--curva) both,
+    vazio-boiando 6s ease-in-out 460ms infinite;
+}
+.icone-vazio {
+  translate: calc(var(--px, 0) * 5px) calc(var(--py, 0) * 5px);
+  transition: translate 400ms var(--curva);
+}
+```
+
+**Pontos que se movem entre dois arranjos** (um gráfico que muda de forma):
+
+```css
+.morph-ponto {
+  transition:
+    left 560ms var(--curva),
+    top 560ms var(--curva),
+    transform 560ms var(--curva),
+    opacity 480ms var(--curva);
+}
+```
+
+**A inicial dentro do avatar cresce com o círculo.** O mesmo avatar aparece de
+24 a 96px. `font-size: 45%` era a armadilha: porcentagem em `font-size` é
+relativa à fonte do pai, e a letra dava 7px em todo tamanho. `cqw` é um por cento
+da largura do contêiner; 44% do diâmetro é a proporção do avatar de inicial do
+Google.
+
+```css
+.avatar-inicial {
+  container-type: inline-size;
+}
+.avatar-inicial > .letra {
+  font-size: 44cqw;
+}
+```
+
+**Foto ampliada por cima de tudo na View Transition.** Os grupos de uma View
+Transition são pintados na ordem em que os nomes aparecem no documento, não pelo
+z-index — a página de trás às vezes cobria a foto no meio da animação.
+`view-transition-class` dá a regra a todas as fotos de uma vez.
+
+```css
+.foto-em-transicao {
+  view-transition-class: foto;
+}
+```
+
+**Área de toque de 44px sem mudar o desenho**, e o respiro do ícone solto:
+
+```css
+.respiro-icone {
+  margin: -0.25rem;
+  padding: 0.25rem;
+  border-radius: var(--raio-pilula);
+}
+.alvo-toque:not(.absolute):not(.fixed):not(.sticky) {
+  position: relative;
+}
+.alvo-toque::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+```
+
+**A logo não leva véu.** O link em volta do símbolo + palavra encolhe à marca, e
+hover/toque não pintam retângulo cinza:
+
+```css
+.logo-link {
+  display: inline-flex;
+  width: fit-content;
+}
+a.logo-link:is(:hover, :active, :focus-visible) {
+  background-image: none;
+  background-color: transparent;
+}
+```
+
+**Seções que só custam quando aparecem.** `content-visibility: auto` pula layout e
+pintura do que está fora da tela; `contain-intrinsic-size` é obrigatório junto,
+senão a seção não pintada vale altura zero e a página pula quando ela entra.
+
+```css
+.secao-longa {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+```
+
+**Leitura sem reancoragem.** A tela de leitura carrega áudio, foto e editor
+enquanto a pessoa lê, e o navegador reancora a rolagem a cada mudança de altura —
+uma correção instantânea que pisa na rolagem suave. Nada ali serve de âncora:
+
+```css
+.texto-da-entrada [class*="min-h-"],
+.texto-da-entrada .ProseMirror {
+  min-height: 0;
+}
+.texto-da-entrada .ProseMirror {
+  padding-bottom: 1.75em;
+  overflow: visible;
+  overflow-anchor: none;
+}
+.texto-da-entrada .ProseMirror > :last-child {
+  margin-bottom: 0;
+}
+.leitura-suave,
+.leitura-suave * {
+  overflow-anchor: none;
+}
+```
+
+**Fila de avisos: um por vez.** Só o primeiro invólucro com conteúdo aparece; os
+seguintes esperam um "+N avisos". Invólucro vazio (aviso que devolveu nada) não
+conta.
+
+```css
+.fila-de-avisos:not(.fila-aberta) > [data-aviso]:not(:empty) ~ [data-aviso]:not(:empty) {
+  display: none;
+}
+```
+
+#### Sequência em tela cheia (palco escuro)
+
+Uma sequência de cenas em tela cheia (uma retrospectiva, um resumo do ano) mora
+num **palco escuro nos dois temas**: é uma sala com a luz apagada, e trocar de
+fundo com o tema tiraria das cenas a única coisa que todas têm em comum. Cada
+série tem a sua cor (`--acento-ano`, de §3.4-b), que tinge o palco inteiro.
+
+```css
+.palco-retrospectiva {
+  background-color: #0a0908;
+  background-image: radial-gradient(
+    120% 65% at 50% 0%,
+    color-mix(in srgb, var(--acento-ano, transparent) 11%, transparent),
+    transparent 62%
+  );
+  color: #fff;
+}
+.palco-retrospectiva .esqueleto {
+  background-color: rgb(255 255 255 / 0.08);
+}
+.palco-retrospectiva .esqueleto::after {
+  background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.1), transparent);
+}
+```
+
+A abertura e o fecho, as cenas sem número nem gráfico, ganham atmosfera: um banho
+radial da cor no fundo, duas manchas que derivam devagar e uma trama de pontos
+que some nas bordas.
+
+```css
+.cena-atmosfera {
+  background-color: #0a0908;
+  background-image:
+    radial-gradient(
+      130% 85% at 50% 0%,
+      color-mix(in srgb, var(--acento-ano, var(--color-acento-500)) 26%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      120% 75% at 50% 108%,
+      color-mix(in srgb, var(--acento-ano, var(--color-acento-500)) 15%, transparent),
+      transparent 58%
+    );
+}
+.aurora-ano {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.aurora-ano::before,
+.aurora-ano::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: var(--acento-ano, var(--color-acento-500));
+  filter: blur(72px);
+}
+.aurora-ano::before {
+  width: 58vmin;
+  height: 58vmin;
+  top: 2%;
+  left: 4%;
+  opacity: 0.42;
+  animation: deriva-aurora 19s ease-in-out infinite alternate;
+}
+.aurora-ano::after {
+  width: 46vmin;
+  height: 46vmin;
+  right: 2%;
+  bottom: 4%;
+  opacity: 0.3;
+  animation: deriva-aurora 24s ease-in-out infinite alternate-reverse;
+}
+.grade-ano {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgb(255 255 255 / 0.11) 1px, transparent 1px);
+  background-size: 26px 26px;
+  -webkit-mask-image: radial-gradient(68% 52% at 50% 45%, #000, transparent 76%);
+  mask-image: radial-gradient(68% 52% at 50% 45%, #000, transparent 76%);
+}
+.selo-abertura {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: var(--raio-pilula);
+  border: 1px solid color-mix(in srgb, var(--acento-ano, var(--color-acento-500)) 45%, transparent);
+  background: color-mix(in srgb, var(--acento-ano, var(--color-acento-500)) 14%, transparent);
+  backdrop-filter: blur(6px);
+}
+```
+
+O número grande (o ano) entra em três camadas: a cópia gigante e vazada atrás, os
+algarismos subindo um a um (110ms entre eles, `--i` no `style`) com perspectiva
+no conjunto, e o degradê do branco para a cor da série.
+
+```css
+.ano-desenhado {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(3.75rem, 20vmin, 8.5rem);
+  line-height: 1;
+  isolation: isolate;
+}
+.ano-fantasma {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: -1;
+  font-size: 1.85em;
+  color: transparent;
+  -webkit-text-stroke: 1.5px color-mix(in srgb, var(--acento-ano, #fff) 55%, transparent);
+  opacity: 0;
+  animation: fantasma-abre 1.6s var(--curva) 120ms both;
+}
+.ano-frente {
+  display: flex;
+  perspective: 700px;
+}
+.ano-digito {
+  display: inline-block;
+  background-image: linear-gradient(
+    175deg,
+    #fff 28%,
+    var(--acento-ano, var(--color-acento-500)) 92%
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: digito-sobe 0.85s var(--curva) both;
+  animation-delay: calc(var(--i, 0) * 110ms);
+}
+```
+
+A moldura (progresso e rodapé) flutua sobre o palco; o respiro é da cena, e dois
+véus de sombra garantem o branco dos controles sobre uma cena clara:
+
+```css
+.retrospectiva-slide[data-visivel="1"] .ponto-do-ano {
+  animation: ponto-acende 0.45s var(--curva) backwards;
+  animation-delay: calc(var(--i, 0) * 22ms);
+}
+.retrospectiva-slide [data-slide-entra] {
+  opacity: 0;
+}
+.retrospectiva-slide[data-visivel="1"] [data-slide-entra] {
+  opacity: 1;
+  animation: surgir 0.7s var(--curva) backwards;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+.retrospectiva-slide[data-visivel="1"] .mapa-barra {
+  transform: scaleX(1);
+  animation: crescer-da-esquerda 600ms var(--curva) backwards;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+.retrospectiva-slide[data-visivel="1"] .anel-emocao {
+  animation: pulso-anel 2.4s var(--curva) infinite;
+}
+.retrospectiva-slide[data-visivel="1"] .anel-emocao:nth-child(2) {
+  animation-delay: 0.7s;
+}
+.retrospectiva-slide[data-visivel="1"] .moodboard > * {
+  animation: surgir 0.5s var(--curva) backwards;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.retrospectiva-slide[data-visivel="1"] .caminho-adiante {
+  animation: riscar-caminho 1400ms var(--curva) forwards;
+}
+.moldura-alto {
+  padding-top: calc(var(--seguro-top) + 1rem);
+}
+.moldura-baixo {
+  padding-bottom: calc(var(--seguro-bottom) + 1.5rem);
+  padding-top: 0.5rem;
+}
+.veu-moldura {
+  pointer-events: none;
+  position: absolute;
+  inset-inline: 0;
+  z-index: 10;
+  height: 9rem;
+}
+.veu-moldura-alto {
+  top: 0;
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.45), transparent);
+}
+.veu-moldura-baixo {
+  bottom: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.45), transparent);
+}
+.retrospectiva-slide {
+  padding-top: calc(var(--seguro-top) + 4.25rem);
+  padding-bottom: calc(var(--seguro-bottom) + 5.5rem);
+}
+```
+
+As cenas trocam com `cena-entra`/`cena-sai` (§6.6), e os traços de progresso
+mudam de cor em `--tempo-normal`:
+
+```css
+.cena-entra {
+  animation: cena-entra 0.32s var(--curva) both;
+}
+.cena-sai {
+  animation: cena-sai 0.2s var(--curva) both;
+}
+.traco-cena > span {
+  transition: background-color var(--tempo-normal) var(--curva);
+}
+.datilografa {
+  display: inline-block;
+  overflow: hidden;
+  white-space: pre-wrap;
+  border-right: 2px solid var(--color-acento-500);
+  animation:
+    datilografa var(--duracao-datilografa, 2.4s) steps(60, end) both,
+    cursor-pisca 0.8s step-end infinite;
+}
+```
 
 ---
 
@@ -1565,6 +2223,18 @@ m: h-11 px-4 text-sm gap-2
 g: h-14 px-5 text-sm gap-2
 ```
 
+**Letra sobre cor: branca no escuro, preta no claro.** Botão (ou chip ativo,
+ou selo) com fundo de uma cor que não é token de papel — a cor de um plano,
+de uma categoria — escolhe a letra pela claridade do fundo: **branca** em cor
+escura ou média, **preta** só em cor clara (amarelo, verde-claro, pastel). O
+corte é L ≈ 0,72 no OKLCH, e não o empate de contraste (L ≈ 0,56): nesse
+ponto um âmbar queimado ou um laranja médio ganhavam letra preta, e o botão
+parecia desligado. Use o utilitário em vez de escolher à mão:
+
+```ts
+color: letraSobre(cor); // oklch(from cor clamp(0, (0.72 - l) * 9999, 1) 0 0)
+```
+
 **Nenhuma variante define hover** — quem faz isso é o véu global. Aqui fica só o
 que a variante **é**, não como ela reage. A exceção é o fantasma, que muda a cor
 do texto: parado ele é quase invisível, e o véu sozinho não o traria para a
@@ -1625,9 +2295,11 @@ Um padding só, o do chip clicável. O chip estático era mais apertado (`py-1`
 contra `py-2`) e a mesma linha misturava duas alturas de pílula sem que nada
 justificasse.
 
-O fundo tingido é **5%** (`--chip-tinta`) — baixo de propósito. Em 15% o chip
-virava um bloco colorido e competia com a palavra que carrega; o fundo existe
-para agrupar, não para gritar. Quem dá a cor é a letra e o ícone.
+O fundo tingido é **15%** (`--chip-tinta`). Já foi 5%, para o chip não virar um
+bloco colorido competindo com a palavra — mas em 5% o fundo sumia, e o chip de
+categoria ficava cinza igual à etiqueta comum (`superficie-2` sobre o cartão).
+15% é o mesmo peso visual da etiqueta: agrupa sem gritar. Quem dá a cor
+continua sendo a letra e o ícone.
 
 `ChipBotao` acrescenta `.pressionavel` e `aria-pressed`. Ativo com cor: fundo
 sólido na cor e letra em `--sobre-emocao`.
@@ -1726,31 +2398,175 @@ Detalhe que custou caro: o `aoFechar` vai por `ref`, e o efeito depende só de
 caso normal) recriava o efeito a cada render, e o "foco de quem abriu" era
 sobrescrito pelo foco do momento.
 
-### 8.5 Trilho (indicador deslizante)
+### 8.5 Trilho (indicador deslizante e arrastável)
 
 ```tsx
-<Trilho ativo={chave} className="superficie-2 rounded-xl" instantaneo? estilo? />
+<Trilho
+  ativo={chave}
+  className="rounded-[var(--raio-pilula)] bg-[var(--texto)]" // cor e raio do fundo
+  estilo={{ backgroundColor: cor }} // aparência que muda com o ativo
+  instantaneo // sem deslize entre itens
+  mola // passa um triz do destino e volta
+  arrastavel={{ aoPassar, aoSoltar, corSobre, soDoAtivo }}
+/>
 ```
 
-O fundo do item ativo **viaja** de um item para o outro em vez de trocar de
-lugar num quadro. É o deslize que conta de onde para onde se foi.
+O fundo do item ativo é **um elemento só**, posicionado por medida, que **viaja**
+de um item para o outro em vez de trocar de lugar num quadro. É o deslize que
+conta de onde para onde se foi. E, quando `arrastavel`, o fundo também **se pega
+com o dedo** e se leva até outra opção, como nos seletores do iOS.
+
+**Montagem**
 
 - O trilho é **irmão** dos itens, não filho: se fosse filho, mudar de item
   significaria desmontá-lo e remontá-lo, e não haveria de onde animar.
-- Quem usa marca cada item com `data-trilho="chave"` e põe `relative` no
-  contêiner; os itens sobem para `z-10`.
-- Mede por `offsetLeft/Top/Width/Height` (relativo ao contêiner, não à janela —
-  a barra do celular é fixa e coordenadas de viewport a deslocariam a cada
-  rolagem), com `ResizeObserver` no pai e nos filhos.
-- Transição: `transform, width, height, background-color` em `--tempo-normal`.
-- `instantaneo` desliga o deslize, para onde outro movimento já conta a história.
-- **Antes da primeira medida, o item ativo pinta o próprio fundo.** Na tela que
-  vem pronta do servidor, o JavaScript ainda não mediu nada, e o item ativo já
-  nasce com o texto na cor de cima do fundo — claro sobre nada, por um segundo.
-  O contêiner ganha `data-trilho-pronto` num `useLayoutEffect` ligado à
-  existência da medida (no mesmo quadro em que o fundo medido aparece); até lá,
-  `.trilho-sem-medida:not([data-trilho-pronto]) > [aria-pressed="true"]` pinta o
-  fundo no próprio item.
+- Quem usa marca cada item com `data-trilho="<chave>"`, põe `relative` no
+  contêiner e `relative z-10` nos itens. O trilho fica por baixo, sem z-index.
+- Uma âncora invisível (`<span hidden>`) é o que acha o contêiner sem pedir
+  `ref` a quem usa.
+
+**Medida**
+
+- Posição relativa ao contêiner, pela diferença dos dois `getBoundingClientRect`
+  (somando `scrollLeft/Top` e descontando `clientLeft/Top`, a borda do pai). Não
+  `offsetLeft`: ele mente quando o alvo está aninhado em outro `relative` (a
+  seta do "mais" da pílula ia parar no offset 0), e coordenadas de janela
+  deslocariam a cada rolagem numa barra `fixed`.
+- `ResizeObserver` no contêiner, no alvo e em cada filho: o ativo muda de
+  largura (o rótulo só aparece nele), e a fonte pode chegar depois da primeira
+  medida.
+- **Medida repetida não vira estado.** Guarda a última assinatura
+  `esquerda|topo|largura|altura` e ignora a igual — o observador dispara ao
+  começar com a mesma medida, e regravar o estado trocaria a transição no meio
+  do deslize e o cortaria.
+- **Mudou o contêiner, não o ativo: acompanha sem animar.** A remedida que vem
+  do contêiner crescendo (a barra lateral abrindo) sai com `transition: none`.
+  Com animação, cada quadro da barra reiniciava os 280ms e o fundo chegava
+  quase um segundo depois dela.
+- **Antes da primeira medida, o item ativo pinta o próprio fundo.** Na tela
+  que vem pronta do servidor, o JavaScript ainda não mediu, e o ativo nasce com
+  a letra clara sobre nada. O contêiner leva `.trilho-sem-medida`; o trilho põe
+  `data-trilho-pronto` nele num `useLayoutEffect` ligado à existência da medida
+  (no mesmo quadro em que o fundo aparece); até lá:
+
+```css
+.trilho-sem-medida:not([data-trilho-pronto]) > [aria-pressed="true"] {
+  background-color: var(--texto);
+}
+```
+
+**Transições**
+
+| Situação                   | `transition` do fundo                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| Troca de ativo (padrão)    | `transform, width, height` em `--tempo-normal --curva` + `background-color --tempo-normal --curva` |
+| `mola`                     | as mesmas, com `--curva-mola` (`cubic-bezier(0.34, 1.56, 0.64, 1)`) em vez de `--curva`            |
+| `instantaneo`              | `none` — o fundo aparece no destino                                                                |
+| Contêiner mudou de tamanho | `none`                                                                                             |
+| Arrastando                 | `none` — segue o dedo sem atraso                                                                   |
+| Soltou (encaixe)           | `transform, width` em `--tempo-rapido --curva`; com `mola`, `--tempo-normal --curva-mola`          |
+| 400ms depois de soltar     | volta ao padrão, mas com `--curva-mola` mesmo no `instantaneo` (`encaixando`), e depois desliga    |
+
+`mola` é para onde a escolha tem peso e não é navegação — a régua de
+intensidade, o gesto mais repetido de um formulário. Numa barra de abas a mola
+viraria enjoo; por isso é escolha de quem usa, não padrão. `instantaneo` é para
+onde outro movimento já conta a história (a troca de painel, §8.6).
+
+**O arrasto, passo a passo**
+
+1. `pointerdown` só conta se o alvo estiver **dentro de uma opção**
+   (`closest("[data-trilho]")`) e for o botão principal. Outros botões do mesmo
+   contêiner (o "+" da pílula) continuam sendo deles.
+2. Com `soDoAtivo`, só a opção **já escolhida** começa o arrasto — como no iOS.
+   É para seletores dentro de uma fileira que rola de lado: encostar nas outras
+   opções continua rolando a fileira. Nesse modo, só a opção ativa ganha
+   `touch-action: pan-y`; sem ele, o contêiner inteiro ganha.
+3. **O gesto precisa provar que é de lado.** Se andar mais de **8px na vertical**
+   e mais na vertical que na horizontal, o trilho desiste (é rolagem). Abaixo de
+   **6px na horizontal**, nada acontece. A partir daí: `setPointerCapture` no
+   contêiner, `preventDefault` a cada movimento, e o contêiner ganha
+   `data-trilho-arrastando` — que apaga o véu de hover de toda opção enquanto
+   dura (senão ele ficava preso onde o dedo começou):
+
+```css
+[data-trilho-arrastando] [data-trilho],
+[data-trilho-arrastando] [data-trilho]:hover {
+  background-image: none !important;
+}
+```
+
+4. **O fundo segue o dedo pelo centro.** A cada movimento: `x` do dedo no
+   sistema do contêiner; as opções ordenadas pela esquerda; o alvo é a opção
+   cujo **centro** está mais perto do dedo.
+5. **A largura muda aos poucos, desde o primeiro milímetro.** Entre os centros
+   de duas opções vizinhas A e B, `t = (x − centroA) / (centroB − centroA)` e
+   `largura = A + (B − A) × t`. Antes do primeiro centro vale a largura da
+   primeira; depois do último, a da última. (Antes ela pulava de uma largura
+   para a outra ao passar da metade.)
+6. **O fundo fica dentro do trilho:** `esquerda = clamp(x − largura/2,
+primeiro.esquerda, ultimo.esquerda + ultimo.largura − largura)`. Topo e
+   altura são os da opção-alvo.
+7. Quando a opção sob o dedo muda: `aoPassar(chave)` e `vibrar("leve")`.
+8. Ao soltar: o clique que o navegador dispara depois do `pointerup` é
+   **engolido** (ouvinte de `click` em captura, `once`, removido em 400ms).
+   Dentro de um `flushSync`: `aoSoltar(chave)` e `aoPassar(null)` — porque o
+   ouvinte é nativo, e um `setState` dali sairia junto com o `startTransition`
+   da navegação e esperaria a rota. **Só então mede o destino**, já com o que
+   ele desenha depois de escolhido (na pílula, o nome aparece e a aba alarga):
+   medir antes gravava a largura do ícone, e o fundo só crescia um segundo
+   depois.
+9. O fundo **encaixa** na opção (estado `solto`, transição de encaixe) e, 320ms
+   depois, devolve o controle ao trilho comum. `pointercancel` desfaz sem
+   escolher.
+
+**O texto invertido (`corSobre`)**
+
+Num fundo escuro (`bg-[var(--texto)]`), a letra da opção escolhida é clara. Com
+o fundo no meio de duas opções, cada uma deveria estar **metade clara, metade
+escura** — exatamente onde o fundo passa. É assim:
+
+- Ao começar o arrasto, o trilho **clona o DOM** de cada opção para uma camada
+  por cima (`.trilho-inverso`, `z-20`, `inert`, `aria-hidden`), cada cópia na
+  posição medida da original. Cópia de DOM, e não outro render, porque o trilho
+  não sabe o que as opções desenham — e a camada só pinta, não reage.
+- A camada inteira é pintada em `--trilho-tinta` (o `corSobre`) e **recortada
+  no retângulo do fundo** por `clip-path: inset(topo direita base esquerda
+round <raio do fundo>)`. O recorte segue o dedo sem atraso e, ao soltar,
+  anima `clip-path` em `--tempo-normal --curva-mola` junto com o encaixe.
+- Enquanto se arrasta, nenhuma opção pinta a letra clara por conta própria
+  (quem usa zera o "aceso" quando `aoPassar` recebe uma chave): quem clareia é
+  só a camada.
+
+```css
+.trilho-inverso,
+.trilho-inverso * {
+  color: var(--trilho-tinta) !important;
+  transition: none !important;
+}
+/* Elemento com tinta própria (a barrinha da régua) segue a mesma cor. */
+.trilho-inverso [data-trilho-tinta] {
+  background-color: var(--trilho-tinta) !important;
+  opacity: 1 !important;
+}
+```
+
+Sem `corSobre` a letra não muda durante o arrasto — serve para fundos claros,
+como o da pílula de navegação.
+
+**Onde cada configuração entra**
+
+| Lugar                        | Fundo                                                                 | Opções                                                         |
+| ---------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Navegação lateral (desktop)  | `superficie-2 rounded-[var(--raio-m)]`                                | só deslize, sem arrasto                                        |
+| Pílula do celular (§9.6)     | `rounded-pilula bg-[color-mix(in_srgb,var(--texto)_10%,transparent)]` | `arrastavel` sem `corSobre`                                    |
+| Seletor segmentado (§8.31)   | `rounded-[calc(var(--raio-m)-0.25rem)] bg-[var(--texto)]`             | `instantaneo`, `corSobre: var(--fundo)`, `soDoAtivo`           |
+| Abas do detalhe              | `rounded-pilula bg-[var(--texto)]`                                    | `instantaneo`, `corSobre: var(--fundo)`                        |
+| Régua de intensidade (§8.32) | `rounded-[var(--raio-m)]` + `estilo` na cor da categoria              | `mola`, `corSobre: var(--sobre-emocao)`; `aoPassar` já escolhe |
+
+A pílula do celular não usa `superficie-2` no fundo: no escuro ela tem quase a
+cor da própria pílula, e o fundo do primeiro item (colado na borda) sumia — mais
+ainda arrastando. Uma camada de 10% do próprio texto dá o mesmo contraste nos
+dois temas.
 
 ### 8.6 TrocaPainel
 
@@ -1774,9 +2590,28 @@ conteúdo, e a pílula viajando competia com ele.
 
 ### 8.7 Chave (liga/desliga)
 
-Trilho `h-7 w-12` pílula; polegar `h-6 w-6` que anda `translate-x-5`. Ligado:
-`--acento-solido`. Desligado: `--superficie-3`. `role="switch"`, `aria-checked`,
-`foco-anel`. Estado ocupado mostra um `Loader2` de 14px sobre o polegar.
+```
+trilho   <button role="switch" aria-checked aria-label>
+         foco-anel relative h-7 w-12 shrink-0 cursor-pointer touch-pan-y
+         rounded-pilula transition-colors duration-[var(--tempo-rapido)]
+         ligado: bg-[var(--acento-solido)] · desligado: superficie-3
+         desabilitado/ocupado: cursor-not-allowed opacity-50
+polegar  absolute left-0.5 top-0.5 h-6 w-6 rounded-pilula bg-white
+         shadow-[var(--sombra-baixa)]
+         transform: translateX(0 | 20px), transition
+         transform --tempo-rapido --curva-mola (passa um triz e assenta)
+ocupado  Loader2 14px animate-spin branco, centrado sobre a chave
+```
+
+O curso do polegar é **20px** (`w-12 − w-6 − 2 × 0.5`).
+
+**Também se arrasta, como no iOS.** O polegar segue o dedo depois de 4px na
+horizontal (`setPointerCapture`), crescendo para `scale(1.08)` e sem transição;
+o trilho **acende assim que o polegar passa da metade**, antes de soltar, com
+`vibrar("leve")` a cada vez que cruza o meio. Ao soltar, fica do lado em que
+estava; o clique que o navegador dispara depois do arrasto é ignorado (a decisão
+já foi tomada ao soltar). Tocar continua alternando. `touch-pan-y` deixa a
+rolagem vertical da página passar.
 
 ### 8.8 Nota
 
@@ -2085,8 +2920,6 @@ E **ação só quando ela faz sentido**: um botão "Renovar" ao lado de um prazo
 meses pela frente é um convite a pagar de novo por algo que a pessoa já tem.
 Mostre-o na janela em que ele é útil (aqui: os últimos 15 dias).
 
----
-
 ### 8.20 Avatar: a inicial antes da foto
 
 Foto de pessoa quase nunca está pronta no primeiro quadro — ela mora num bucket
@@ -2123,10 +2956,6 @@ Quatro decisões, e todas importam:
    texto de leitura: é o desenho de uma forma.
 
 Sem nenhuma letra no nome (alguém salvo só com emoji), aí sim volta o ícone.
-
----
-
----
 
 ### 8.21 Abas (guias)
 
@@ -2335,8 +3164,6 @@ avatar), o desenho é um só:
 border-white` e o escurecido por `box-shadow: 0 0 0 9999px rgb(0 0 0 /
 0.45)`.
 
----
-
 ### 8.26 Distribuição (partes de um todo)
 
 Quando os números **somam um total** (planos das contas, jeitos de criar um
@@ -2427,6 +3254,421 @@ tela com uma `<Nota>` em cima — nunca uma tela em branco.
 Assinatura em tempo real do banco só serve quando as regras de acesso deixam
 quem olha ver as linhas de todo mundo; se o acesso é por linha do próprio
 usuário, a leitura periódica pelo servidor é o caminho.
+
+### 8.31 Seletor segmentado
+
+```tsx
+<SeletorSegmentado valor={modo} opcoes={[{ valor, rotulo, icone? }]} aoEscolher={setModo} />
+```
+
+Duas ou três opções lado a lado, excludentes, com o fundo escuro viajando até a
+escolhida e **arrastável** (§8.5). Use no lugar de um filtro suspenso quando as
+opções são poucas, fixas e vale mostrar todas ao mesmo tempo — a escolha se
+entende sem abrir nada.
+
+```
+contêiner  trilho-sem-medida relative inline-flex items-stretch gap-1
+           rounded-[var(--raio-m)] border border-[var(--borda)] superficie-2 p-1
+<Trilho>   instantaneo, rounded-[calc(var(--raio-m)-0.25rem)] bg-[var(--texto)]
+           arrastavel: corSobre var(--fundo), soDoAtivo
+opção      relative z-10 flex items-center gap-1.5 whitespace-nowrap
+           rounded-[calc(var(--raio-m)-0.25rem)] px-3 py-1 txt-sm font-semibold
+           transition-colors, cursor-pointer, data-trilho, aria-pressed
+           escolhida: text-[var(--fundo)] · outras: t2 hover:text-[var(--texto)]
+```
+
+- **Mesma altura do filtro suspenso**, de propósito: os dois convivem na mesma
+  fileira, e alturas diferentes lado a lado denunciam layout montado aos
+  pedaços. A conta: o filtro tem borda de 1px e `py-2` (8px); aqui a borda é
+  igual e os 8px se dividem entre o `p-1` do contêiner e o `py-1` da opção.
+- **Raio `--raio-m`, não pílula**: numa fileira de retângulos arredondados, uma
+  cápsula seria o único elemento de outra forma. O fundo interno usa o raio de
+  fora menos o padding (`calc(var(--raio-m) - 0.25rem)`), para os cantos ficarem
+  concêntricos.
+- **Instantâneo**: quem usa já troca o painel inteiro, e o deslize competiria.
+- **`soDoAtivo`**: mora em fileiras que rolam de lado; só o fundo escolhido se
+  arrasta, o resto continua rolando a fileira.
+- Enquanto se arrasta, nenhuma opção pinta a letra clara (`aoPassar` zera o
+  "aceso"): quem clareia é a camada invertida, só onde o fundo está.
+
+### 8.32 Escolha de categoria com régua (`HumorInterativo`)
+
+A escolha de uma categoria com intensidade como uma pergunta, e não um
+formulário. De cima para baixo:
+
+```
+invólucro     relative flex w-full flex-col items-center gap-5
+"limpar"      (opcional, só com algo escolhido) absolute right-0 top-0
+              foco-anel t3 animar-surgir rounded-[var(--raio-p)] px-2 py-1
+              txt-sm font-medium hover:text-[var(--texto)]
+rosto         .humor-rosto grid h-24 w-24 sm:h-28 sm:w-28 place-items-center
+              rounded-pilula, fundo na cor da categoria (sem escolha:
+              --superficie-2), ícone 40px (48 no sm) em --sobre-emocao (sem
+              escolha: --texto-3, Smile com traço 1.5); key = categoria
+nome          display txt-titulo leading-tight, na cor da categoria;
+              sem escolha, a pergunta, e embaixo t3 mt-1 max-w-[34ch] txt-xs
+régua         (só com categoria escolhida) animar-surgir w-full
+              cabeçalho: mb-2 flex items-baseline justify-between gap-2,
+              .rotulo à esquerda, nome do grau txt-sm font-semibold na cor
+grade         SeletorEmocao (§8.33), largura inteira
+```
+
+```css
+.humor-rosto {
+  box-shadow: var(--sombra-baixa);
+  transition:
+    background-color var(--tempo-normal) var(--curva),
+    color var(--tempo-normal) var(--curva);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .humor-rosto {
+    animation: humor-reage 420ms var(--curva) backwards; /* 0.88 → 1.04 → 1 */
+  }
+}
+```
+
+A `key` do rosto é a categoria: cada troca remonta o elemento e a animação
+reinicia — é o rosto "reagindo". Escolher **não avança a tela sozinho**: um
+toque em falso não pode levar a pessoa adiante; quem chama põe o botão de seguir.
+
+**A régua de intensidade** são cinco degraus que se tocam ou se arrastam, e não
+um `<input type="range">`: a intensidade tem cinco valores com nome, e um
+controle contínuo escondia isso.
+
+```
+grade    relative grid touch-pan-y select-none grid-cols-5 gap-1.5
+<Trilho> mola, rounded-[var(--raio-m)], estilo: backgroundColor = cor
+         arrastavel: corSobre var(--sobre-emocao); aoPassar JÁ escolhe
+         (o número e o nome acompanham o dedo), aoSoltar confirma
+degrau   foco-anel relative z-10 flex flex-col items-center gap-1.5
+         rounded-[var(--raio-m)] px-1 py-2.5 transition-colors
+         duration-[var(--tempo-rapido)]; cor: --sobre-emocao no escolhido,
+         --texto-3 nos outros
+barrinha w-1 rounded-pilula, altura 6 + i×4 px (6, 10, 14, 18, 22),
+         fundo --sobre-emocao no escolhido e a cor da categoria a 45% nos
+         outros; transition height e background-color --tempo-normal;
+         data-trilho-tinta (fica na cor invertida durante o arrasto)
+número   txt-xs font-semibold leading-none
+legenda  t3 mt-1.5 flex justify-between txt-xs: o nome do 1º e o do 5º
+```
+
+A barrinha cresce com o grau: a escala se vê antes de se ler.
+
+### 8.33 Grade de categorias (`SeletorEmocao`)
+
+Ladrilhos com ícone em cima e nome embaixo, numa grade cujo número de colunas
+vem da largura do **contêiner**, não da tela (`@container`): a mesma grade mora
+numa coluna estreita e numa tela cheia.
+
+```
+grade    grid grid-cols-3 gap-2 sm:grid-cols-5 @xl:grid-cols-6, role="group"
+ladrilho foco-anel relative isolate flex min-w-0 flex-col items-center gap-1.5
+         overflow-hidden rounded-[var(--raio-m)] px-1 py-3
+         transition-[color,transform] duration-[var(--tempo-normal)]
+         active:scale-95, aria-pressed
+         fundo: color-mix(cor, calc(var(--chip-tinta) / 2)) — METADE da tinta
+         letra: a cor; escolhido: --sobre-emocao
+preench. absolute inset-0 -z-10 rounded-[inherit] na cor cheia;
+         escolhido: .preenche-emocao opacity-100 (cresce de 0.4 a 1)
+         outros: opacity-0 (transition-opacity --tempo-normal; sem
+         transição sob movimento reduzido)
+ícone    h-5 w-5
+nome     w-full hyphens-auto break-words text-center txt-xs font-semibold
+         leading-tight — quebra em vez de cortar com reticências
+```
+
+- **Ordem alfabética no idioma de quem lê** (`Intl.Collator(idioma,
+{ sensitivity: "base" })`): com dezenas de itens, a ordem por família
+  obrigava a varrer a grade inteira.
+- **As mais usadas na primeira fileira**: até quatro, com três escolhas ou mais
+  (contagem guardada no aparelho), lidas **uma vez** ao abrir — reordenar
+  enquanto se escolhe moveria o ladrilho de baixo do dedo.
+- **O escolhido cresce; o que sai só apaga**, no mesmo tamanho. Zoom nos dois
+  sentidos parecia o anterior encolhendo para dentro.
+- Com `limite`, a grade fechada mostra as mais usadas e completa em ordem
+  alfabética; **a escolhida nunca some ao fechar**. O botão de abrir: `foco-anel
+t2 mx-auto mt-3 block rounded-[var(--raio-p)] px-3 py-2 txt-sm font-semibold`.
+
+### 8.34 Medidor de intensidade
+
+A intensidade como uma onda, num SVG `viewBox="0 0 40 40"` (padrão 40px): um
+ponto no centro (`r=2.5`, opacidade `forca × 0.6`) e **um anel por grau**
+(`r = 6 + i × 3.3`, `stroke-width 1.8`, sem preenchimento, opacidade
+`forca × (1 − i × 0.12)`), com `forca = 0.3 + (grau − 1) × 0.175` (0,3 no grau 1,
+1 no grau 5). Só os anéis do grau aparecem: anéis apagados à vista brigavam com
+o fundo tingido.
+
+Tracinhos crescentes pareciam o sinal do celular; um anel em gomos lia como
+progresso (5 de 5 = completo). Intensidade é força, não meta.
+
+Passar o mouse sobre os anéis mostra uma dica com "3/5" e o ponto da cor, que
+segue o ponteiro 14px acima dele, em portal no `body` (dentro do cartão ela era
+cortada): `pointer-events-none fixed flex items-center gap-2 whitespace-nowrap
+rounded-[var(--raio-m)] border border-[var(--borda)] px-3 py-1.5
+shadow-[var(--sombra)] backdrop-blur-md`, fundo `color-mix(--superficie 82%,
+transparent)`, `translate(-50%, -100%)`, `z-index: var(--z-avisos)`. No toque,
+tocar nos anéis mostra a dica acima deles por 1,8s (e o toque não abre o cartão
+em volta). Rolar a página apaga a dica.
+
+### 8.35 Campo segmentado (data e hora)
+
+```tsx
+<CampoSegmentado
+  rotulo="Dia" separador="/"
+  segmentos={[{ chave: "dia", tamanho: 2, min: 1, max: 31, rotulo, placeholder: "dd" }, …]}
+  valores={partes} aoMudar={setPartes} aoSair={aoSairDoGrupo}
+/>
+```
+
+Data ou hora em pedaços: **cada número é um campo próprio**. Um texto só com
+máscara ("12/10/2026") reformatava a cada tecla e jogava o cursor para o fim:
+apagar o dia para trocar levava junto o resto.
+
+- **Tocar num pedaço seleciona ele inteiro**, e o que se digita substitui no
+  lugar (`onFocus` → `select()`; `onMouseUp` → `preventDefault`, porque no
+  celular o toque solta a seleção).
+- **Completo, o cursor segue para o próximo.** Um dígito que não pode começar um
+  número de dois já é o número: "4" no dia vira `04` e segue; "2" no mês vira
+  `02`. (Regra: se `dígito × 10 > max`, completa com zero.)
+- Saiu de um pedaço com um dígito só ("3"): vale `03` — lido do próprio campo no
+  `blur`, não do estado, que ainda é o de antes da tecla.
+- **Backspace num pedaço vazio volta ao anterior**; ← no início e → no fim
+  andam entre pedaços; **↑ e ↓ somam e tiram um**, dando a volta (31 → 1).
+- `aoSair` só dispara quando o foco sai do **grupo** (não de um pedaço para o
+  outro): é ali que quem usa descarta o que ficou incompleto.
+
+```
+grupo    role="group" aria-label, flex min-w-0 items-center tabular-nums
+separ.   t3 px-0.5 (aria-hidden)
+pedaço   inputMode="numeric" autoComplete="off", width: (tamanho + 0.5)ch
+         rounded-[var(--raio-p)] bg-transparent text-center txt-md outline-none
+         placeholder:text-[var(--texto-3)] focus:bg-[var(--superficie-hover)]
+```
+
+O seletor de data completo põe isso num invólucro `foco-anel-dentro flex
+items-center gap-2.5 rounded-[var(--raio-m)] superficie-2 px-3.5 py-3`, com um
+botão de calendário de 24px à esquerda que abre um calendário em menu suspenso
+(§8.37, `cartao animar-surgir w-72 p-4 shadow-[var(--sombra-alta)]`). Dia e hora
+ficam empilhados por padrão, com o rótulo em `.rotulo` e `gap-1.5`; lado a lado
+(`grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-3`) só onde há largura. Data
+inválida (31/02, que o `Date` transforma em 3 de março sem avisar) não é aceita:
+o dia e o mês precisam voltar iguais ao digitado.
+
+### 8.36 Campo com sugestões
+
+Campo de texto que sugere enquanto se escreve. A alternativa — a lista inteira
+de opções desenhada como botões — mentia: com fundo em todas, parecia que todas
+estavam escolhidas. Aqui a lista só existe enquanto se procura.
+
+- **Um valor só** (`escolhidas` vazio): o texto **é** o valor, e a lista não
+  filtra por ele — filtrar deixaria a pessoa sem sugestão nenhuma assim que
+  escrevesse algo fora da lista.
+- **Vários** (com `aoRemover`): o texto é só busca, quem já foi escolhido sai da
+  lista, e os escolhidos viram fichas abaixo do campo.
+- A busca ignora acento e caixa (`normalize("NFD")` sem diacríticos) e procura no
+  rótulo e no id.
+
+```
+campo    w-full rounded-[var(--raio-m)] superficie-2 px-4 py-2.5 txt-md
+         outline-none foco-anel transition-colors duration-[var(--tempo-rapido)]
+         placeholder:text-[var(--texto-3)]
+fichas   flex flex-wrap items-center gap-1.5
+ficha    flex items-center gap-1 rounded-pilula bg-[var(--texto)] py-1 pl-3 pr-1.5
+         txt-xs font-semibold text-[var(--fundo)]; X 12px num botão
+         foco-anel rounded-pilula p-0.5 opacity-70 hover:opacity-100
+menu     MenuSuspenso alinhar="esticar", cartao p-2 shadow-[var(--sombra-alta)]
+lista    esconder-barra flex max-h-[min(14rem,40dvh)] flex-wrap gap-1.5
+         overflow-y-auto overscroll-contain, data-lenis-prevent
+sugestão superficie-2 t2 rounded-pilula px-3 py-1.5 txt-xs font-medium
+         hover:text-[var(--texto)]
+```
+
+O clique numa sugestão chega porque ela usa `onMouseDown` com `preventDefault`
+(o campo nem perde o foco) e o `blur` do campo fecha a lista só 150ms depois.
+
+### 8.37 Menu suspenso (base de todo menu que nasce de um botão)
+
+`<MenuSuspenso aberto ancora aoFechar alinhar="esquerda|direita|esticar">` pinta
+**no `document.body`, por portal**. Sem o portal o `z-index` não chega: uma lista
+virtualizada (com `transform`) e as animações de entrada criam contextos de
+empilhamento, e o menu ficava atrás dos cartões.
+
+```
+fundo   fixed inset-0 z-[60], toque fecha (acima da nav z-40, abaixo das folhas)
+painel  fixed z-[61], data-lenis-prevent; padrão:
+        rounded-[var(--raio-m)] border border-[var(--borda)]
+        bg-[var(--superficie)] p-1.5 shadow-[var(--sombra-alta)]
+        antes da primeira medida: visibility hidden
+```
+
+**Posição** (folga de 8px da janela): largura = a do gatilho em `esticar`, senão
+a do painel limitada a `janela − 16`; `left` = borda esquerda do gatilho (ou a
+direita menos a largura, em `direita`), empurrada para caber; `top` = base do
+gatilho + 4px, e **se não couber embaixo, sobe** (topo do gatilho − 4 − altura),
+desde que caiba em cima. Recalcula na rolagem de qualquer contêiner (ouvinte em
+captura) e no resize — **exceto a rolagem de dentro do próprio painel**, que
+fazia a lista tremer de lado. Só troca o estado quando a posição mudou de fato.
+
+**Teclado**: aberto pelo teclado (`:focus-visible` no gatilho), o foco entra no
+primeiro item; aberto pelo toque, não (abriria o teclado do celular numa busca).
+Esc fecha e devolve o foco ao gatilho, em captura (para não fechar junto a folha
+de baixo); Tab saindo por uma das pontas fecha e devolve. Se o gatilho é um
+campo de texto, o foco fica nele.
+
+`data-lenis-prevent` em todo painel: sem ele, girar a roda sobre a lista rolava
+a página atrás.
+
+### 8.38 Dica de primeira vez
+
+Um balão no formato dos avisos, **embaixo da tela** (não um cartão no meio do
+conteúdo), que aparece uma vez por **conta** (a marca de vista sobe para a
+nuvem e vale em todo aparelho), 900ms depois de a tela abrir, e sai sozinha em
+**7 segundos** — ou antes, no X ou arrastando para o lado. Conta como vista
+assim que aparece. **Uma por vez**: a seguinte espera numa fila global.
+
+```
+lugar    na pilha dos avisos, se existir (#vaga-da-dica); senão
+         fixed inset-x-0 bottom-0 flex justify-center px-4
+         pb-[calc(var(--altura-nav)+var(--seguro-bottom)+0.5rem)] lg:pb-4;
+         na tela de criar (onde a ação principal mora embaixo), sobe para o
+         topo: pt-[calc(var(--seguro-top)+0.75rem)]; z-index var(--z-avisos)
+invólucro .aviso-abrindo w-full max-w-md  ← a animação de entrada fica AQUI
+cartão   cartao pointer-events-auto relative flex w-full touch-pan-y
+         select-none items-start gap-2.5 py-3 pl-4 pr-10
+         shadow-[var(--sombra-alta)], role="status"
+ícone    Lightbulb 16px, mt-0.5, no acento
+texto    flex-1 txt-sm leading-relaxed
+fechar   alvo-toque foco-anel t3 absolute right-2 top-2 rounded-[var(--raio-p)]
+         p-1, X 14px
+```
+
+**Arrastar para dispensar** (só toque): espera 6px antes de decidir; mais
+vertical que horizontal é rolagem e solta o gesto. O cartão segue o dedo
+(`translateX(dx)`, `opacity: 1 − |dx|/240`, sem transição); soltar além de
+**80px** joga para o lado (`dx = direção × largura da janela`, transição
+`transform/opacity --tempo-normal --curva`) e solta a vaga 280ms depois; aquém,
+volta. A animação de entrada fica num invólucro **por fora**: no próprio cartão,
+o `both` dela terminava em `transform: none` e vencia o estilo inline — o cartão
+não acompanhava o dedo.
+
+### 8.39 Dica de gráfico (segue o ponteiro)
+
+`useDicaGrafico()` devolve `{ area, serie, marca, Caixa }`.
+
+- **Modo faixa** (gráfico de série): um só ouvinte no contêiner descobre o item
+  pelo X do ponteiro. Com `fatias` (barras), `índice = floor(fração × n)`; sem
+  (pontos de uma curva), `round(fração × (n − 1))`. O fio e a caixa **grudam no
+  centro do item**, não no ponteiro: a dica parece presa ao dado.
+- **Modo marca** (grade de dois eixos, como um calendário): cada célula abre a
+  dica no `pointerenter`/`pointerdown`.
+- **Só o contêiner apaga a dica.** Com um `pointerleave` por marca, atravessar de
+  uma barra para a vizinha disparava o `leave` antes do `enter`, e a caixa
+  piscava a cada poucos pixels.
+- No toque não há `leave`: a dica some sozinha em **2,6s**.
+
+```
+fio    absolute inset-y-0 w-px, tracejado:
+       repeating-linear-gradient(to bottom, var(--texto-3) 0 3px, transparent 3px 6px)
+caixa  pointer-events-none absolute z-30 w-max max-w-[min(20rem,80vw)]
+       rounded-[var(--raio-m)] border border-[var(--borda)]
+       bg-[var(--superficie)] px-3 py-2 shadow-[var(--sombra-alta)]
+       role="status" aria-live="polite"
+       acima: top = y − 12, translate(-50%, -100%)
+       se y < 76 (sem espaço em cima): top = y + 14, translate(-50%, 0)
+       x preso à JANELA com 8px de folga — a caixa pode transbordar o cartão,
+       que é o que impede o corte no celular
+```
+
+O conteúdo tem uma anatomia só (`CorpoDaDica`): título `t3 mb-1 txt-xs font-bold
+uppercase tracking-wider`; valor principal `txt-sm font-semibold` ao lado de um
+ponto `h-2.5 w-2.5` na cor; linhas de apoio `t3 mt-0.5 txt-xs`. Tudo
+`whitespace-nowrap` — a caixa cresce em vez de quebrar a frase.
+
+### 8.40 Tela de trabalho (espera que se explica)
+
+Para operações longas (transcrever, ler um documento, analisar): ícone vivo,
+barra que anda e o passo em palavras.
+
+```
+coluna   animar-surgir flex w-full flex-col items-center gap-4 text-center
+anel     relative h-14 w-14; SVG viewBox 100, dois círculos r=46 stroke-width 5
+         no acento: a pista a 18% e o arco (dasharray "80 210", linecap round)
+         girando: .anel-trabalho { animation: girar-anel 1.15s linear infinite }
+ícone    h-11 w-11 rounded-pilula bg-acento-500/10 text-acento-500, svg 20px
+título   display txt-lg
+agora    t2 txt-sm leading-relaxed, role="status" aria-live="polite"
+barra    superficie-2 h-1.5 w-full max-w-xs overflow-hidden rounded-pilula,
+         role="progressbar"; preenchimento bg-acento-500 com .barra-viva
+         (listras diagonais de 30% do texto-sobre-acento correndo:
+         correr-listras 800ms linear infinite) e transition-[width]
+         --tempo-normal linear; embaixo, t3 numeral txt-xs tabular-nums "42%"
+passos   esconder-barra flex max-h-40 max-w-xs flex-col gap-1.5 overflow-y-auto
+         (só com mais de um passo); linha flex items-center gap-2.5 txt-xs
+         feito: t2 + círculo 16px bg-acento-500/15 com Check 10px traço 3.5
+         agora: font-semibold --texto + ponto 8px .animar-pulsar no acento
+         falhou: --perigo + círculo --perigo-tenue com X 10px traço 3.5
+         espera: t3 + ponto 6px --borda-forte
+nota     t3 max-w-xs txt-xs leading-relaxed
+```
+
+**A barra nunca para e nunca mente.** `valor` é o que já terminou de verdade;
+`passo` é o tamanho do trecho em curso (1/n, não o que falta). A cada **160ms** a
+barra anda `7%` do que falta até o teto do trecho, que é `valor + passo × 0,85`:
+desacelera perto do fim e nunca declara concluído o que não concluiu. Nunca
+recua dentro do mesmo trabalho. Com `desde` (o instante em que o trabalho
+começou), voltar à tela não zera a barra: ela reaparece onde o tempo já a teria
+levado (`valor + (teto − valor) × (1 − 0,93^ticks)`).
+
+Sem como medir o meio (uma ida só ao servidor), a barra é **indeterminada**: um
+terço da largura correndo de um lado ao outro (`barra-indeterminada`), sem
+número. Antes ela subia até ~80% e parava lá, o que lia como travado.
+
+### 8.41 Puxar para atualizar
+
+Só no app instalado (`display-mode: standalone`) — no navegador o gesto já
+existe e recarrega a página inteira — e só no celular (`lg:hidden`). Começa com
+a página no topo e o dedo descendo; qualquer outra rolagem segue intacta; dentro
+de folhas (`[role="dialog"]`) e de `[data-sem-puxar]` não começa.
+
+- O indicador anda **0,45 × o dedo**, com teto de 96px; vale a partir de **64px**
+  amortecidos, com `vibrar("leve")` ao cruzar.
+- Círculo `superficie h-9 w-9 rounded-full shadow-[var(--sombra)]` descendo de
+  `fixed inset-x-0 top-0 z-30 pt-[var(--seguro-top)]` com
+  `translateY(altura × 0.6)`; ícone `RefreshCw` 16px em `--acento-texto`, girando
+  `puxado/64 × 270°` e com opacidade `puxado/64` enquanto se puxa; atualizando,
+  fica a 48px com `animate-spin` (parado sob movimento reduzido), `role="status"`.
+- Não desenha nada até o dedo puxar.
+
+### 8.42 Peças pequenas
+
+**Dígitos que rolam.** Num número que muda sozinho (o cronômetro), só o dígito
+que mudou se mexe. Cada caractere é um `<span class="digito-rolando">` com
+`key = posição + caractere`: o dígito que não mudou é o **mesmo nó**, e animação
+de entrada não roda em nó que já existia; o que trocou vira nó novo e sobe
+(`rolar-digito --tempo-rapido`). Sem estado nenhum, sem render extra por segundo.
+`tabular-nums` é obrigação de quem chama.
+
+**Fileira que avisa que rola.** Uma fileira horizontal cortada seca na borda
+parecia terminar ali. A borda do lado que ainda tem conteúdo esmaece por máscara:
+`linear-gradient(to right, <transparent se há mais à esquerda, senão black> 0,
+black 2rem, black calc(100% - 2rem), <idem à direita> 100%)`, medido no `scroll`
+(passivo) e por `ResizeObserver`, com 2px de tolerância. Com `setas` (só `md+`,
+onde não há dedo), um botão de cada lado com conteúdo: `foco-anel superficie
+absolute top-1/2 h-10 w-10 -translate-y-1/2 rounded-full shadow-[var(--sombra)]
+hover:bg-[var(--superficie-hover)]`, chevron 20px, que anda 80% da largura com
+`scrollBy({ behavior: "smooth" })`.
+
+**Perguntas frequentes.** Acordeão sem cartão, só linhas finas entre as
+perguntas (`border-t` em cada uma, `border-b` no conjunto). Cabeçalho `flex
+items-start justify-between gap-3 px-3 py-3.5 txt-sm font-semibold
+leading-snug`, hover `bg-[var(--superficie-hover)]` e letra no acento, **de ponta
+a ponta e sem raio** (com raio, a faixa entre duas linhas retas parecia um botão
+solto). Ícone `Plus` 16px `t3` que gira 45° aberto (`group-open:rotate-45`,
+`--tempo-rapido`). Resposta `t2 animar-surgir px-3 pb-4 txt-sm leading-relaxed`.
+As respostas ficam no HTML, fechadas, para o buscador ler o mesmo que o
+`FAQPage` diz.
+
+---
 
 ## 9. Moldura e navegação
 
@@ -2726,11 +3968,13 @@ Pílula flutuante no rodapé, não barra colada. As medidas exatas:
 
 ```
 invólucro  pb-segura fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-3 lg:hidden
- └ nav     relative z-40 flex items-center gap-1 rounded-[var(--raio-pilula)] border p-1.5
+ └ nav     relative z-40 flex min-w-0 max-w-full items-center gap-1
+           rounded-[var(--raio-pilula)] border p-1.5
            shadow-[var(--sombra-alta)] backdrop-blur-xl
            background: color-mix(in srgb, var(--superficie) 82%, transparent)
-    ├ <Trilho>        superficie-2 rounded-[var(--raio-pilula)]
-    ├ item fixo ×2    relative z-10 flex h-11 items-center gap-2 px-4
+    ├ <Trilho>        rounded-[var(--raio-pilula)] arrastável,
+    │                 bg-[color-mix(in_srgb,var(--texto)_10%,transparent)]
+    ├ item fixo ×2    relative z-10 flex h-[44px] items-center gap-2 px-[16px]
     │                 rounded-[var(--raio-pilula)] txt-sm font-semibold
     │                 transition-colors duration-[var(--tempo-rapido)]
     │                 ativo: text-[var(--texto)] · inativo: t3
@@ -2765,6 +4009,89 @@ invólucro  pb-segura fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-
 { padding: 0 }`): com o `px-4` do botão médio, o svg encolhia no flex.
 - Fundo do menu aberto: `fixed inset-0 z-30 bg-black/5 backdrop-blur-sm`
   (`dark:bg-black/20`), com `.animar-fade-in`; tocar nele fecha.
+- **A pílula é arrastável** (`<Trilho arrastavel>`, §8.5): encostar numa aba e
+  deslizar leva o fundo com o dedo, abas acendem conforme ele passa (só a cor da
+  letra e do ícone, sem `corSobre`), e soltar navega. Soltar no "mais" abre o
+  menu. A navegação sai num `queueMicrotask` depois do soltar, e não no mesmo
+  gesto: o trilho precisa medir a aba **já com o nome nela**, e o
+  `router.push` abriria uma transição que segurava esse estado até a tela nova
+  chegar.
+- **O que a pílula mostra segue o toque, não a rota.** Ao tocar (ou soltar) numa
+  aba, um estado `tocado = { de: rota_atual, para: destino }` acende o destino
+  na hora; ele só vale enquanto a rota ainda é `de` e se apaga quando a nova
+  chega. O `aria-current="page"` continua dizendo onde a pessoa de fato está.
+  Sem isso, a pílula ficava um instante acesa na aba de onde se saiu.
+- **A aba ativa que mora no menu dá o nome à seta**: em uma tela do "mais", a
+  seta mostra `ChevronUp` + o rótulo da tela (`truncate`), e o trilho cobre os
+  dois. Voltando para uma aba fixa, o nome sai da seta.
+- **Tocar de novo na aba em que se está rola até o topo** (pelo motor de rolagem
+  suave, imediato sob movimento reduzido), em vez de não fazer nada.
+- **Fonte do sistema grande** (Android em 150%, 200%): a `nav` é
+  `min-w-0 max-w-full`, o padding das abas é `px-[16px]` (em pixels, não `px-4`
+  em rem, que cresceria junto com a fonte) e quem cede é o rótulo da aba ativa
+  (`min-w-0` nela, `shrink-0` nas outras). Sem isso o "+" saía da tela.
+
+**Segurar o "+"** abre os jeitos de criar sem passar pela tela de escolha:
+
+```
+segurando   o botão encolhe para scale-[0.92] (transform --tempo-normal --curva)
+            e um anel SVG se fecha em volta dele, por cima, sem eventos:
+              <svg viewBox="0 0 44 44" class="anel-segurar absolute inset-0">
+                <circle cx="22" cy="22" r="20" pathLength="100" />
+              circle: stroke var(--acento-solido-texto), stroke-width 2.5,
+                      linecap round, dasharray 100, dashoffset 100 → 0,
+                      rotate(-90deg) (começa no topo),
+                      animation fechar-anel 450ms linear forwards
+450ms       (DURACAO_SEGURAR_MS — o MESMO número do anel) o menu abre,
+            vibrar("leve"), o "+" gira 135° até virar um × (transform
+            --tempo-normal --curva), e o menu das abas, se aberto, fecha
+deslizar    sem soltar, para cima: setPointerCapture no botão mantém o dedo
+            dele; a cada movimento, elementFromPoint(x, y)
+            .closest("[data-opcao-nova]") acende a opção sob o dedo
+            (superficie-2, letra --texto, ícone no acento) com vibrar("leve")
+            a cada troca
+soltar      em cima de uma opção abre ela; fora, o menu fica aberto e um
+            toque escolhe; o clique que vem depois do segurar é ignorado
+toque curto (antes dos 450ms) vai para a tela de escolha, como sempre
+```
+
+O botão é `touch-none`, cancela o menu de contexto (`onContextMenu` →
+`preventDefault`) e é um **botão, não link**: segurar um link no app instalado
+abria a prévia do endereço por cima do menu. O `title` vai vazio pelo mesmo
+motivo (o Android mostrava o rótulo como dica no toque longo).
+
+O menu de criar sai do mesmo lugar e com a mesma cara do menu "mais":
+
+```
+menu    absolute bottom-full right-0 mb-3 w-52 flex flex-col gap-1
+        rounded-[var(--raio-g)] border p-1.5 shadow-[var(--sombra-alta)]
+        backdrop-blur-xl, fundo color-mix(--superficie 90%, transparent)
+        role="menu"; entra com .brota-do-botao, sai com .volta-para-o-botao
+item    h-11 flex items-center gap-3 rounded-[var(--raio-m)] px-3 txt-sm
+        font-semibold, role="menuitem", primeira letra maiúscula
+        repouso: t3 + hover:bg-[var(--superficie-hover)]
+        sob o dedo: superficie-2 + text-[var(--texto)], ícone no acento
+ícone   18×18, traço 2.1
+```
+
+```css
+.brota-do-botao {
+  animation: brotar-do-canto 200ms var(--curva) both;
+  transform-origin: bottom right;
+}
+.volta-para-o-botao {
+  animation: voltar-para-o-canto 150ms var(--curva-saida) both;
+  transform-origin: bottom right;
+}
+```
+
+Rascunhos esperando aparecem como um **ponto** no "+": `absolute right-1.5
+top-1.5 h-2.5 w-2.5 rounded-full`, preenchido em `--acento-solido-texto` com
+`ring-2` em `--acento-solido`, entrando com `.animar-surgir`. No botão grande do
+desktop vira o número: `absolute right-3 top-1/2 -translate-y-1/2 rounded-pilula
+px-2 py-0.5 txt-xs font-semibold tabular-nums`, fundo
+`color-mix(--acento-solido-texto 22%, transparent)`.
+
 - A barra **não some ao rolar**. Ela é o chão do app.
 - **Nada de `view-transition-name` na barra.** Um elemento nomeado para View
   Transition é fotografado e promovido para a camada da transição — e ali o
@@ -2772,9 +4099,9 @@ invólucro  pb-segura fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-
   em quando": era quando havia transição em curso.
 
 ```css
-/* 44px do item + 6px de padding em cima e embaixo + 12px de folga. O <main>
-   reserva exatamente isso, em vez de uma faixa fixa bem maior que a barra. */
---altura-nav: 4.75rem;
+/* O <main> reserva exatamente a altura da pílula mais a folga até a borda,
+   em vez de uma faixa fixa bem maior que a barra. */
+--altura-nav: 5.5rem;
 .pt-segura {
   padding-top: env(safe-area-inset-top);
 }
@@ -3143,18 +4470,23 @@ Todos só em `(pointer: coarse)` e todos desligados sob movimento reduzido. A
 regra da resistência: **o dedo anda três, a tela anda um** — é o que impede um
 deslize distraído de disparar a ação.
 
-| Gesto                     | Limiar | Resistência   | Sinal                                      |
-| ------------------------- | ------ | ------------- | ------------------------------------------ |
-| Voltar (borda esquerda)   | 90px   | ÷3, máx 50%   | faixa de 24px na borda; volta em 260ms     |
-| Ação no cartão (deslizar) | 72px   | ÷3            | ícone aparecendo atrás                     |
-| Puxar para atualizar      | 72px   | ÷2, máx 108px | ícone gira `puxada × 3°` e cresce até 1.12 |
-| Fechar folha (arrastar)   | 64px   | ÷3            | alça + fundo clareando                     |
+| Gesto                     | Limiar                                | Resistência                 | Sinal                                                                       |
+| ------------------------- | ------------------------------------- | --------------------------- | --------------------------------------------------------------------------- |
+| Voltar (borda esquerda)   | 90px                                  | ÷3, máx 50%                 | faixa de 24px na borda; volta em 260ms                                      |
+| Ação no cartão (deslizar) | 72px                                  | ÷3                          | ícone aparecendo atrás                                                      |
+| Puxar para atualizar      | 64px                                  | ×0,45, máx 96px             | ícone gira `puxado/64 × 270°` e acende; `vibrar("leve")` ao valer (§8.41)   |
+| Fechar folha (arrastar)   | 64px                                  | ÷3                          | alça + fundo clareando                                                      |
+| Arrastar fundo de opções  | 6px de lado (8px na vertical desiste) | 1:1                         | fundo segue o dedo, largura misturada, `vibrar("leve")` a cada opção (§8.5) |
+| Arrastar a chave          | 4px de lado                           | 1:1, curso 20px             | polegar a `scale(1.08)`; trilho acende ao passar da metade (§8.7)           |
+| Segurar o "+"             | 450ms                                 | —                           | anel se fecha em volta; depois, deslizar até a opção e soltar (§9.6)        |
+| Dispensar dica (de lado)  | 80px                                  | 1:1, opacidade `1 − dx/240` | sai para o lado em que foi jogada (§8.38)                                   |
 
 O gesto de voltar só começa se o movimento for horizontal e passar de 12px — o
 vertical continua sendo rolagem. O de arrastar a folha só começa se a rolagem
 interna estiver no topo, e só conta movimento para baixo.
 
-O retorno elástico do puxar-para-atualizar usa a mola de §6.4.
+Os gestos de arrastar opções, a chave e a dica funcionam também com mouse
+(exceto a dica, só no toque), porque reproduzem um controle e não um atalho.
 
 ---
 
