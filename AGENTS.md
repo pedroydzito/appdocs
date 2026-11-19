@@ -8,6 +8,8 @@ qualquer código**, e por inteiro:
    componentes, navegação, padrões de tela.
 3. `desempenho.md` — cache, listas, offline, imagens, rede, banco.
 4. `operacao.md` — ambiente, banco, login, PWA, CI, deploy.
+5. `texto-e-acabamento.md` — o que sai da tela; como usar a skill
+   `unslop-ui` (em `ferramentas/unslop-ui/`, registrada em `.claude/skills/`).
 
 Três regras que valem para tudo o que você for fazer:
 
@@ -15,5 +17,5 @@ Três regras que valem para tudo o que você for fazer:
   especificado. Se faltar alguma coisa, derive do que existe e diga que derivou.
 - **Faltou informação sobre o app? Pergunte.** Não adivinhe nome, cor de acento,
   destinos de navegação nem quais recursos entram.
-- **Os checklists são obrigatórios**: design system §15, desempenho §15 e
-  operação §18, item a item, antes de dar o trabalho por pronto.
+- **Os checklists são obrigatórios**: design system §15, desempenho §15,
+  operação §18 e texto e acabamento §6, item a item, antes de dar o trabalho por pronto.

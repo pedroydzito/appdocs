@@ -1,7 +1,8 @@
 # Base para aplicativos
 
-Três documentos que descrevem, por inteiro, como um aplicativo web deve ser
-desenhado, como deve responder e como deve ser operado. Eles saíram de um app
+Quatro documentos e uma ferramenta que descrevem, por inteiro, como um site ou
+aplicativo web deve ser desenhado, como deve responder, como deve ser operado e
+o que não deve estar na tela. Eles saíram de um app
 real em produção, mas nada aqui depende do assunto dele.
 
 A ideia é simples: **aponte uma IA para este repositório e peça o app que você
@@ -14,6 +15,12 @@ conteúdo.
 | [`design-system.md`](design-system.md) | Como o app **parece** e como ele **reage** ao toque   |
 | [`desempenho.md`](desempenho.md)       | Como o app **responde**: cache, listas, offline, rede |
 | [`operacao.md`](operacao.md)           | Como o app **existe**: banco, login, PWA, deploy, CI  |
+| [`texto-e-acabamento.md`](texto-e-acabamento.md) | O que **sai** da tela: enfeite, texto de IA, ruído |
+
+E uma ferramenta: [`ferramentas/unslop-ui/`](ferramentas/unslop-ui/) — a skill
+[unslop-ui](https://github.com/felipebasurto/unslop-ui) (MIT), que acha e corta
+os sinais de "tela feita por IA" (U1–U20) e entrega um relatório do que cortou.
+Neste repositório ela já está registrada: `/unslop-ui <arquivo ou pasta>`.
 
 > **Já tem um app e ele está lento?** Vá direto para
 > [`desempenho.md` §16](desempenho.md#16-diagnóstico-o-meu-app-demora-para-carregar-as-telas):
@@ -28,8 +35,8 @@ conteúdo.
 Cole isto na conversa com a IA, trocando o que está entre colchetes:
 
 > Use como base o repositório https://github.com/pedroydzito/appdocs — leia os
-> três documentos (`design-system.md`, `desempenho.md`, `operacao.md`) por
-> inteiro antes de escrever qualquer código, e siga-os à risca.
+> quatro documentos (`design-system.md`, `desempenho.md`, `operacao.md`,
+> `texto-e-acabamento.md`) por inteiro antes de escrever qualquer código, e siga-os à risca.
 >
 > Quero construir: **[descreva o app em duas ou três frases: para quem é, o que
 > a pessoa faz nele, qual é a ação principal]**.
@@ -44,7 +51,8 @@ Cole isto na conversa com a IA, trocando o que está entre colchetes:
 >
 > Siga a §14 do design system para adaptar o acento e as categorias. Monte a
 > página `/estilo` com os quatro temas. Não invente token, componente nem
-> duração fora do que está especificado.
+> duração fora do que está especificado. Ao terminar cada tela, passe o
+> unslop-ui nela (`texto-e-acabamento.md`) e me mostre o relatório.
 
 Se algum item ficar em branco, a IA deve **perguntar antes de começar** — não
 adivinhar.
@@ -110,9 +118,11 @@ Se mexer nisto, o resultado deixa de parecer o mesmo produto:
 6. **Telas** do app, usando só o que existe nos passos 2 e 4.
 7. **PWA** — manifesto, ícones, service worker (operação §4).
 8. **CI e deploy** (operação §12–§13).
+9. **Acabamento** — `/unslop-ui --surface` em cada tela (texto e acabamento).
 
-Ao final, os três checklists — o do design system §15, o do desempenho §15 e o
-de lançamento em operação §18 — precisam passar item a item.
+Ao final, os quatro checklists — o do design system §15, o do desempenho §15, o
+de lançamento em operação §18 e o de texto e acabamento §6 — precisam passar
+item a item.
 
 ---
 
