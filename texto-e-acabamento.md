@@ -163,5 +163,9 @@ Antes de dar uma tela por pronta, junto com o DS §15:
 pasta e rode os testes:
 
 ```bash
-cd ferramentas/unslop-ui && python3 -m unittest discover -s tests && python3 evals/run.py
+cd ferramentas/unslop-ui && python3 -m unittest discover -s tests
 ```
+
+`evals/run.py` é outra coisa: chama um agente de verdade (`claude -p`) sobre
+os casos de `evals/fixtures/` e confere o que ele preservou. Gasta tokens e o
+resultado depende do agente; rode à mão quando mudar a skill, com ela instalada.
