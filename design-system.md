@@ -660,6 +660,10 @@ saída é a lista: **um cartão por linha no celular**, duas colunas a partir de
 }
 ```
 
+**A sobrancelha diz um fato que o título não diz.** Repetir o nome da seção
+("VISÃO GERAL" acima de "Visão geral") é o sinal U1 de
+[`texto-e-acabamento.md`](texto-e-acabamento.md) e sai.
+
 **A sobrancelha é curta, e não é rótulo de tudo.** Duas armadilhas, as duas
 vistas em produção:
 
@@ -4673,6 +4677,7 @@ Antes de dar uma tela por pronta:
 - [ ] Número em cartão que divide a linha usa o degrau estreito: com dado real e
       comprido, o texto não sai pela borda.
 - [ ] Sobrancelha cabe em uma linha; rótulo de ajuste é frase, não caixa alta.
+- [ ] Passou o `/unslop-ui` e o checklist de `texto-e-acabamento.md` §6.
 - [ ] O que é `fixed` dentro da tela vai por portal — a animação de entrada é
       bloco de contenção.
 - [ ] A tela registrou a sua ação principal, e não criou um "+" próprio.
